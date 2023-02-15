@@ -1,0 +1,10 @@
+[package]
+name = "obj.exchange"
+version = "0.0.1"
+
+[dependencies]
+Sui = { local = "/Users/yusong/works/rust/sui/crates/sui-framework" }
+
+[addresses]
+obj =  "0x0"
+sui =  "0000000000000000000000000000000000000002"
