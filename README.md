@@ -29,10 +29,3 @@ sui client call --package $PKG --module marketplace --function buy --type-args 0
 ```shell
 
 ```
-
-
-## TODO
-- 完成多（绑定）item上架
-- 完成collecion offer&互换
-- 完成indexer入库（postgres）
-- 前端设计
