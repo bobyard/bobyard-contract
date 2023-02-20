@@ -4,9 +4,9 @@ module obj::marketplace {
     use sui::object::{Self, ID, UID};
     use sui::coin::Coin;
     use sui::transfer;
-    use std::vector;
     use sui::event;
     use sui::event::emit;
+    use sui::pay;
 
     const EAmountIncorrect: u64 = 0;
     const ENotOwner: u64 = 1;
@@ -15,8 +15,8 @@ module obj::marketplace {
     struct Marketplace<phantom T> has key {
         id: UID,
         offer_id: UID,
+        owner: address
     }
-
 
     struct Listing has key, store {
         id: UID,
@@ -82,25 +82,22 @@ module obj::marketplace {
             offer_id: object::uid_to_inner(&offer_id),
         });
 
-        transfer::share_object(Marketplace<MKTYPE> { id, offer_id })
+        transfer::share_object(Marketplace<MKTYPE> { id, offer_id, owner: tx_context::sender(ctx) })
     }
-
 
     public entry fun list<T: key + store, MKTYPE>(
         marketplace: &mut Marketplace<MKTYPE>,
-        items: vector<T>,
+        item: T,
         ask: u64,
         ctx: &mut TxContext
     ) {
-        assert!(vector::length(&mut items) == 0, EEmptyObjects);
+        // assert!(vector::length(&mut items) == 0, EEmptyObjects);
+        // let items = Items {
+        //     id: object::new(ctx),
+        //     items
+        // };
 
-        let items = Items {
-            id: object::new(ctx),
-            items
-        };
-
-
-        let list_id = object::id(&mut items);
+        let list_id = object::id(&mut item);
         let owner = tx_context::sender(ctx);
 
         let listing = Listing {
@@ -109,7 +106,7 @@ module obj::marketplace {
             owner,
         };
 
-        ofield::add(&mut listing.id, true, items);
+        ofield::add(&mut listing.id, true, item);
         ofield::add(&mut marketplace.id, list_id, listing);
 
         event::emit(ListEvent {
@@ -132,20 +129,9 @@ module obj::marketplace {
 
         assert!(tx_context::sender(ctx) == owner, ENotOwner);
 
-        let Items {
-            id: uid,
-            items,
-        } = ofield::remove(&mut id, true);
+        let item: T = ofield::remove(&mut id, true);
         object::delete(id);
-        object::delete(uid);
-
-        let item_length = vector::length(&mut items);
-        while (item_length > 0) {
-            let item: T = vector::pop_back(&mut items);
-            transfer::transfer(item, owner);
-            item_length = item_length - 1;
-        };
-        vector::destroy_empty(items);
+        transfer::transfer(item, owner);
 
         emit(DeListEvent {
             list_id: item_id,
@@ -158,7 +144,7 @@ module obj::marketplace {
         marketplace: &mut Marketplace<MKTYPE>,
         item_id: ID,
         paid: Coin<MKTYPE>
-    ): Items<T> {
+    ): T {
         let Listing {
             id,
             ask,
@@ -173,10 +159,9 @@ module obj::marketplace {
             owner,
         });
 
-        let items = ofield::remove(&mut id, true);
+        let item = ofield::remove(&mut id, true);
         object::delete(id);
-
-        items
+        item
     }
 
     public entry fun buy_and_take<T: key + store, COIN>(
@@ -191,7 +176,7 @@ module obj::marketplace {
         );
     }
 
-    public entry fun accept_offer<T: key+store, COIN>(
+    public entry fun accept_offer<BuyItem: key+store, SellItem: key+store, COIN>(
         marketplace: &mut Marketplace<COIN>,
         list_id: ID,
         offer_id: ID,
@@ -206,7 +191,6 @@ module obj::marketplace {
         } = ofield::remove(&mut marketplace.id, list_id);
         assert!(sender == owner, ENotOwner);
 
-
         //for buyer
         let Offers {
             id: offer_uid,
@@ -215,53 +199,28 @@ module obj::marketplace {
             owner: buyer,
         } = ofield::remove(&mut marketplace.offer_id, offer_id);
 
-        let Items<T> {
-            id: item_id,
-            items,
-        } = ofield::remove(&mut offer_uid, true);
-        object::delete(item_id);
+        let paid: SellItem = ofield::remove(&mut offer_uid, true);
         object::delete(offer_uid);
-
-        let item_length = vector::length(&mut items);
-        while (item_length > 0) {
-            let item: T = vector::pop_back(&mut items);
-            transfer::transfer(item, owner);
-            item_length = item_length - 1;
-        };
-        vector::destroy_empty(items);
-
+        transfer::transfer(paid, owner);
 
         // for seller
-        let Items<T> {
-            id: items_id,
-            items,
-        } = ofield::remove(&mut list_uid, true);
+        let list_item: BuyItem = ofield::remove(&mut list_uid, true);
         object::delete(list_uid);
-        object::delete(items_id);
+        transfer::transfer(list_item, buyer);
 
-        let item_length = vector::length(&mut items);
-        while (item_length > 0) {
-            let item: T = vector::pop_back(&mut items);
-            transfer::transfer(item, buyer);
-            item_length = item_length - 1;
-        };
-        vector::destroy_empty(items)
+        //TODO emit event
     }
 
     public entry fun make_offer<T: key + store, NKTYPE>(
         marketplace: &mut Marketplace<NKTYPE>,
         item_id: ID,
-        paids: vector<T>,
+        paid: T,
         expire_time: u64,
         ctx: &mut TxContext)
     {
-        let items = Items<T> {
-            id: object::new(ctx),
-            items: paids,
-        };
         let owner = tx_context::sender(ctx);
 
-        let id = object::id(&items);
+        let id = object::id(&paid);
         let offer = Offers {
             id: object::new(ctx),
             item_id,
@@ -269,7 +228,7 @@ module obj::marketplace {
             owner
         };
 
-        ofield::add(&mut offer.id, true, items);
+        ofield::add(&mut offer.id, true, paid);
         ofield::add(&mut marketplace.offer_id, id, offer);
 
         emit(OfferEvent { offer_id: id, expire_time, owner })
@@ -288,21 +247,14 @@ module obj::marketplace {
         } = ofield::remove(&mut marketplace.offer_id, offer_id);
         assert!(tx_context::sender(ctx) == owner, ENotOwner);
 
-        let Items<T> {
-            id: items_id,
-            items,
-        } = ofield::remove(&mut id, true);
+        let item: T = ofield::remove(&mut id, true);
+        transfer::transfer(item, owner);
 
-        let item_length = vector::length(&mut items);
-
-        while (item_length > 0) {
-            let item: T = vector::pop_back(&mut items);
-            transfer::transfer(item, owner);
-            item_length = item_length - 1;
-        };
-
+        //TODO emit event
         object::delete(id);
-        object::delete(items_id);
-        vector::destroy_empty(items);
+    }
+
+    public entry fun merge_coins<T>(coins: vector<Coin<T>>, ctx: &mut TxContext) {
+        pay::join_vec_and_transfer(coins, tx_context::sender(ctx))
     }
 }
