@@ -12,6 +12,11 @@ module obj::marketplace {
     const ENotOwner: u64 = 1;
     const EEmptyObjects: u64 = 2;
 
+    struct Admin has key {
+        id: UID,
+        owner: address,
+    }
+
     struct Marketplace<phantom T> has key {
         id: UID,
         offer_id: UID,
@@ -66,14 +71,30 @@ module obj::marketplace {
         owner: address,
     }
 
+    struct AcceptOfferEvent has copy, drop {
+        offer_id: ID,
+        owner: address,
+    }
+
     struct OfferEvent has copy, drop {
         offer_id: ID,
         expire_time: u64,
         owner: address,
     }
 
-    public entry fun create<MKTYPE>(ctx: &mut TxContext) {
-        //assert!(tx_context::sender(ctx) == @obj, ENotOwner);
+    struct CancelOfferEvent has copy, drop {
+        offer_id: ID,
+        owner: address,
+    }
+
+
+    fun init(ctx: &mut TxContext) {
+        transfer::share_object(Admin { id: object::new(ctx), owner: tx_context::sender(ctx) })
+    }
+
+    public entry fun create<MKTYPE>(admin: &Admin, ctx: &mut TxContext) {
+        assert!(tx_context::sender(ctx) == admin.owner, ENotOwner);
+
         let id = object::new(ctx);
         let offer_id = object::new(ctx);
 
@@ -91,12 +112,6 @@ module obj::marketplace {
         ask: u64,
         ctx: &mut TxContext
     ) {
-        // assert!(vector::length(&mut items) == 0, EEmptyObjects);
-        // let items = Items {
-        //     id: object::new(ctx),
-        //     items
-        // };
-
         let list_id = object::id(&mut item);
         let owner = tx_context::sender(ctx);
 
@@ -208,7 +223,11 @@ module obj::marketplace {
         object::delete(list_uid);
         transfer::transfer(list_item, buyer);
 
-        //TODO emit event
+        //emit event
+        emit(AcceptOfferEvent {
+            offer_id,
+            owner,
+        });
     }
 
     public entry fun make_offer<T: key + store, NKTYPE>(
@@ -250,8 +269,13 @@ module obj::marketplace {
         let item: T = ofield::remove(&mut id, true);
         transfer::transfer(item, owner);
 
-        //TODO emit event
-        object::delete(id);
+        //emit event
+        emit(CancelOfferEvent {
+            offer_id,
+            owner,
+        });
+
+        object::delete(id)
     }
 
     public entry fun merge_coins<T>(coins: vector<Coin<T>>, ctx: &mut TxContext) {
