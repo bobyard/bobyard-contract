@@ -6,7 +6,6 @@ module obj::marketplace {
     use sui::transfer;
     use sui::event;
     use sui::event::emit;
-    use sui::pay;
 
     const EAmountIncorrect: u64 = 0;
     const ENotOwner: u64 = 1;
@@ -22,6 +21,7 @@ module obj::marketplace {
         offer_id: UID,
         owner: address
     }
+
 
     struct Listing has key, store {
         id: UID,
@@ -69,21 +69,26 @@ module obj::marketplace {
         list_id: ID,
         ask: u64,
         owner: address,
+        buyer: address,
     }
 
     struct AcceptOfferEvent has copy, drop {
         offer_id: ID,
+        list_id: ID,
         owner: address,
+        buyer: address,
     }
 
     struct OfferEvent has copy, drop {
         offer_id: ID,
+        list_id: ID,
         expire_time: u64,
         owner: address,
     }
 
     struct CancelOfferEvent has copy, drop {
         offer_id: ID,
+        list_id: ID,
         owner: address,
     }
 
@@ -158,7 +163,8 @@ module obj::marketplace {
     public fun buy<T: key + store, MKTYPE>(
         marketplace: &mut Marketplace<MKTYPE>,
         item_id: ID,
-        paid: Coin<MKTYPE>
+        paid: Coin<MKTYPE>,
+        ctx: &mut TxContext
     ): T {
         let Listing {
             id,
@@ -172,6 +178,7 @@ module obj::marketplace {
             list_id: item_id,
             ask,
             owner,
+            buyer: tx_context::sender(ctx)
         });
 
         let item = ofield::remove(&mut id, true);
@@ -186,7 +193,7 @@ module obj::marketplace {
         ctx: &mut TxContext
     ) {
         transfer::transfer(
-            buy<T, COIN>(marketplace, item_id, paid),
+            buy<T, COIN>(marketplace, item_id, paid, ctx),
             tx_context::sender(ctx)
         );
     }
@@ -204,12 +211,13 @@ module obj::marketplace {
             owner,
             ask: _,
         } = ofield::remove(&mut marketplace.id, list_id);
+
         assert!(sender == owner, ENotOwner);
 
         //for buyer
         let Offers {
             id: offer_uid,
-            item_id: _,
+            item_id,
             expire_time: _,
             owner: buyer,
         } = ofield::remove(&mut marketplace.offer_id, offer_id);
@@ -226,7 +234,9 @@ module obj::marketplace {
         //emit event
         emit(AcceptOfferEvent {
             offer_id,
+            list_id: item_id,
             owner,
+            buyer,
         });
     }
 
@@ -250,7 +260,7 @@ module obj::marketplace {
         ofield::add(&mut offer.id, true, paid);
         ofield::add(&mut marketplace.offer_id, id, offer);
 
-        emit(OfferEvent { offer_id: id, expire_time, owner })
+        emit(OfferEvent { offer_id: id, list_id: item_id, expire_time, owner })
     }
 
     public entry fun cancel_offer<T: key + store, MKTYPE>(
@@ -260,7 +270,7 @@ module obj::marketplace {
     ) {
         let Offers {
             id,
-            item_id: _,
+            item_id,
             expire_time: _,
             owner,
         } = ofield::remove(&mut marketplace.offer_id, offer_id);
@@ -272,13 +282,10 @@ module obj::marketplace {
         //emit event
         emit(CancelOfferEvent {
             offer_id,
+            list_id: item_id,
             owner,
         });
 
         object::delete(id)
-    }
-
-    public entry fun merge_coins<T>(coins: vector<Coin<T>>, ctx: &mut TxContext) {
-        pay::join_vec_and_transfer(coins, tx_context::sender(ctx))
     }
 }
