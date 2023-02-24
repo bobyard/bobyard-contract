@@ -2,14 +2,16 @@ module obj::marketplace {
     use sui::dynamic_object_field as ofield;
     use sui::tx_context::{Self, TxContext};
     use sui::object::{Self, ID, UID};
-    use sui::coin::Coin;
+    use sui::coin::{Coin,Self};
     use sui::transfer;
     use sui::event;
     use sui::event::emit;
 
+
     const EAmountIncorrect: u64 = 0;
     const ENotOwner: u64 = 1;
     const EEmptyObjects: u64 = 2;
+    const EBuyerCanBeSeller:u64 = 3;
 
     struct Admin has key {
         id: UID,
@@ -21,7 +23,6 @@ module obj::marketplace {
         offer_id: UID,
         owner: address
     }
-
 
     struct Listing has key, store {
         id: UID,
@@ -171,14 +172,27 @@ module obj::marketplace {
             ask,
             owner
         } = ofield::remove(&mut marketplace.id, item_id);
+        assert!(ask < coin::value(&paid),EAmountIncorrect);
 
-        transfer::transfer(paid, owner);
+        let buyer = tx_context::sender(ctx);
+        assert!(buyer == owner,EBuyerCanBeSeller);
+
+        if (ask == coin::value(&paid)) {
+            transfer::transfer(paid, owner);
+        } else {
+            let take = coin::split(&mut paid,ask,ctx);
+            transfer::transfer(take, owner);
+            transfer::transfer(paid, buyer);
+        };
+
+
+
 
         emit(BuyEvent {
             list_id: item_id,
             ask,
             owner,
-            buyer: tx_context::sender(ctx)
+            buyer,
         });
 
         let item = ofield::remove(&mut id, true);
@@ -189,11 +203,20 @@ module obj::marketplace {
     public entry fun buy_and_take<T: key + store, COIN>(
         marketplace: &mut Marketplace<COIN>,
         item_id: ID,
-        paid: Coin<COIN>,
+        paid: vector<Coin<COIN>>,
         ctx: &mut TxContext
     ) {
+        use sui::pay::join_vec;
+        use sui::coin::zero;
+
+        let to_mark_paid = zero<COIN>(ctx);
+        //if (vector::length(&paid) > 1){
+         //   let a = vector::pop_back(&mut paid);
+        join_vec(&mut to_mark_paid,paid);
+        //};
+
         transfer::transfer(
-            buy<T, COIN>(marketplace, item_id, paid, ctx),
+            buy<T, COIN>(marketplace, item_id, to_mark_paid, ctx),
             tx_context::sender(ctx)
         );
     }
