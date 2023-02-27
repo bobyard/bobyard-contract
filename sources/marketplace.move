@@ -1,4 +1,4 @@
-module obj::marketplace {
+module bob::marketplace {
     use sui::dynamic_object_field as ofield;
     use sui::tx_context::{Self, TxContext};
     use sui::object::{Self, ID, UID};
@@ -6,7 +6,7 @@ module obj::marketplace {
     use sui::transfer;
     use sui::event;
     use sui::event::emit;
-
+    use sui::collectible::Collectible;
 
     const EAmountIncorrect: u64 = 0;
     const ENotOwner: u64 = 1;
@@ -114,7 +114,7 @@ module obj::marketplace {
 
     public entry fun list<T: key + store, MKTYPE>(
         marketplace: &mut Marketplace<MKTYPE>,
-        item: T,
+        item: Collectible<T>,
         ask: u64,
         ctx: &mut TxContext
     ) {
@@ -151,8 +151,8 @@ module obj::marketplace {
         assert!(tx_context::sender(ctx) == owner, ENotOwner);
 
         let item: T = ofield::remove(&mut id, true);
-        object::delete(id);
         transfer::transfer(item, owner);
+        object::delete(id);
 
         emit(DeListEvent {
             list_id: item_id,
@@ -166,27 +166,15 @@ module obj::marketplace {
         item_id: ID,
         paid: Coin<MKTYPE>,
         ctx: &mut TxContext
-    ): T {
+    ): (Collectible<T>,Coin<MKTYPE>) {
         let Listing {
             id,
             ask,
             owner
         } = ofield::remove(&mut marketplace.id, item_id);
         assert!(ask < coin::value(&paid),EAmountIncorrect);
-
         let buyer = tx_context::sender(ctx);
-        assert!(buyer == owner,EBuyerCanBeSeller);
-
-        if (ask == coin::value(&paid)) {
-            transfer::transfer(paid, owner);
-        } else {
-            let take = coin::split(&mut paid,ask,ctx);
-            transfer::transfer(take, owner);
-            transfer::transfer(paid, buyer);
-        };
-
-
-
+        assert!(buyer != owner,EBuyerCanBeSeller);
 
         emit(BuyEvent {
             list_id: item_id,
@@ -195,12 +183,20 @@ module obj::marketplace {
             buyer,
         });
 
-        let item = ofield::remove(&mut id, true);
+        let item:Collectible<T> = ofield::remove(&mut id, true);
         object::delete(id);
-        item
+
+        if (ask == coin::value(&paid)) {
+            transfer::transfer(paid, owner);
+            return (item,coin::zero<MKTYPE>(ctx))
+        } else {
+            let take = coin::split(&mut paid,ask,ctx);
+            transfer::transfer(take, owner);
+            return (item,paid)
+        }
     }
 
-    public entry fun buy_and_take<T: key + store, COIN>(
+    public entry fun buy_one<T: key + store, COIN>(
         marketplace: &mut Marketplace<COIN>,
         item_id: ID,
         paid: vector<Coin<COIN>>,
@@ -208,16 +204,21 @@ module obj::marketplace {
     ) {
         use sui::pay::join_vec;
         use sui::coin::zero;
+        let sender = tx_context::sender(ctx);
 
         let to_mark_paid = zero<COIN>(ctx);
-        //if (vector::length(&paid) > 1){
-         //   let a = vector::pop_back(&mut paid);
         join_vec(&mut to_mark_paid,paid);
-        //};
+
+        let (item,c) = buy<T, COIN>(marketplace, item_id, to_mark_paid, ctx);
 
         transfer::transfer(
-            buy<T, COIN>(marketplace, item_id, to_mark_paid, ctx),
-            tx_context::sender(ctx)
+            item,
+            sender
+        );
+
+        transfer::transfer(
+            c,
+            sender,
         );
     }
 
@@ -250,7 +251,7 @@ module obj::marketplace {
         transfer::transfer(paid, owner);
 
         // for seller
-        let list_item: BuyItem = ofield::remove(&mut list_uid, true);
+        let list_item: Collectible<BuyItem> = ofield::remove(&mut list_uid, true);
         object::delete(list_uid);
         transfer::transfer(list_item, buyer);
 

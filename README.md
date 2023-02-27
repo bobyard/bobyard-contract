@@ -5,12 +5,13 @@
 ```shell
 PKG=
 MK=
+ADMIN=
 ```
 
 
 ## Init Market with Coin type
 ```shell
-sui client call --package $PKG --module marketplace --function create --type-args  0x2::sui::SUI --args 0xc1abebd6884f6f9a74d6ffd5f36108a2745d42bb --gas-budget 300000
+sui client call --package $PKG --module marketplace --function create --type-args  0x2::sui::SUI --args $ADMIN --gas-budget 300000
 ```
 
 
@@ -23,7 +24,7 @@ sui client call --package $PKG --module marketplace --function list --type-args 
 ## Buy Object
 
 ```shell
-sui client call --package $PKG --module marketplace --function buy_and_take --type-args 0x2::devnet_nft::DevNetNFT 0x2::sui::SUI  --args $MK 0x15d669bcac7b018f84baaa15048acbf4c54340e7 0x377c51b45ffa1dc5ef3fb59a833cdb1dcd175634 --gas-budget 300000
+sui client call --package $PKG --module marketplace --function buy_one --type-args 0x2::devnet_nft::DevNetNFT 0x2::sui::SUI  --args $MK 0x15d669bcac7b018f84baaa15048acbf4c54340e7 0x377c51b45ffa1dc5ef3fb59a833cdb1dcd175634 --gas-budget 300000
 ```
 
 ## Make Offer
@@ -41,3 +42,9 @@ sui client call --package $PKG --module marketplace --function cancel_offer --ty
 ```shell
 sui client call --package $PKG --module marketplace --function accept_offer --type-args 0x2::devnet_nft::DevNetNFT 0x2::sui::SUI  --args $MK 0xa4e25513b1c4ac125929c3a350590e77206ea369 0x3473808455e7c09d1496cfa5498ff4a983b6c8f6 --gas-budget 300000
 ```
+
+## mint testnft
+```shell
+ sui client call --package $PKG --module testnet --function mint --type-args 0x5c2a7f3228da0569b47065d8e0b81bbf9bae2f0e::testnet::TestNFt --args 0xc7a18c16fc27bf0c808f9cef12924beb37b42e40 --gas-budget 300000
+```
+

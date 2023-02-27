@@ -1,10 +1,10 @@
 [package]
-name = "obj.exchange"
+name = "bobyard.io"
 version = "0.0.1"
 
 [dependencies]
-Sui = { local = "/Users/yusong/works/rust/sui/crates/sui-framework" }
+Sui = { local = "/Users/yusong/works/rust/bobyard-sui/crates/sui-framework" }
 
 [addresses]
-obj =  "0x0"
+bob =  "0x0"
 sui =  "0000000000000000000000000000000000000002"
