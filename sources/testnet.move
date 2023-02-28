@@ -1,5 +1,5 @@
 module bob::testnet{
-    use sui::collectible::{create_collection, Collectible, CollectionCreatorCap};
+    use sui::collectible::{create_collection, CollectionCreatorCap};
     use sui::tx_context::TxContext;
     use std::option::{some, none};
     use sui::object::UID;
