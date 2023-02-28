@@ -1,14 +1,15 @@
 module bob::nft {
     use sui::tx_context::TxContext;
     use sui::collectible::{create_collection, CollectionCreatorCap, Collectible};
-    use sui::transfer::share_object;
+    use sui::transfer::{share_object, transfer};
     use std::option::{none, Option};
     use sui::object::UID;
     use sui::object;
     use sui::publisher::Publisher;
     use sui::display;
-    use bob::lanchpad::{BobYardLanchpad, init_lanchpad};
+    use bob::launchpad::{BobYardLanchpad, init_launchpad};
     use std::string::String;
+    use sui::tx_context;
 
     struct NFT has drop {}
 
@@ -57,10 +58,14 @@ module bob::nft {
         public_mint_price: u64,
         public_sale_mint_time: u64,
         public_sale_end_time: u64,
-        mint_cap: CollectionCreatorCap<BobYard>,
+        hoder:Hoder,
         ctx: &mut TxContext,
     ) {
-        init_lanchpad(
+        let Hoder{id,pub,mint_ablity} = hoder;
+        object::delete(id);
+        transfer(pub,tx_context::sender(ctx));
+
+        init_launchpad(
             bobyard,
             name,
             website,
@@ -83,7 +88,7 @@ module bob::nft {
             public_mint_price,
             public_sale_mint_time,
             public_sale_end_time,
-            mint_cap,
+            mint_ablity,
             ctx,
         );
     }
