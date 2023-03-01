@@ -45,6 +45,10 @@ sui client call --package $PKG --module marketplace --function accept_offer --ty
 
 ## mint testnft
 ```shell
- sui client call --package $PKG --module testnet --function mint --type-args 0x5c2a7f3228da0569b47065d8e0b81bbf9bae2f0e::testnet::TestNFt --args 0xc7a18c16fc27bf0c808f9cef12924beb37b42e40 --gas-budget 300000
+sui client call --package $PKG --module testnet --function mint --type-args 0x5c2a7f3228da0569b47065d8e0b81bbf9bae2f0e::testnet::TestNFt --args 0xc7a18c16fc27bf0c808f9cef12924beb37b42e40 --gas-budget 300000
 ```
 
+## init lanchpad
+```shell
+sui client call --package $PKG --module nft --function create_lanchpad --type-args 0x5c2a7f3228da0569b47065d8e0b81bbf9bae2f0e::testnet::TestNFt --args  --gas-budget 300000
+```
