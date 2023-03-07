@@ -1,4 +1,4 @@
-# obj.exchange smart contract
+# The bobyard.io nft marketplace smart contract
 
 # Contract call
 ## init shell value
