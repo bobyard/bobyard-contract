@@ -3,8 +3,8 @@ name = "bobyard.io"
 version = "0.0.1"
 
 [dependencies]
-Sui = { local = "/Users/yusong/works/rust/bobyard-sui/crates/sui-framework" }
+Sui = { local = "/home/yusong/works/cargo_workes/sui/crates/sui-framework" }
 
 [addresses]
 bob =  "0x0"
-sui =  "0000000000000000000000000000000000000002"
+sui =  "0x2"

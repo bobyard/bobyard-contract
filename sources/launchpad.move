@@ -11,10 +11,8 @@ module bob::launchpad {
     use sui::tx_context;
     use sui::vec_set::VecSet;
     use sui::vec_set;
-    use bob::merkle_proof;
     use sui::collectible;
     use sui::transfer;
-    use std::type_name::into_string;
     use std::string;
     use std::bcs;
 
@@ -144,9 +142,8 @@ module bob::launchpad {
         ofield::add(&mut bobyard.id, id, lanch);
     }
 
-    public entry fun og_mint<T: store, NFT: key+store>(bobyard: &mut BobYardLaunchpad, launch_id:ID, proof:vector<vector<u8>>, num:u64, ctx:&mut TxContext) {
+    public entry fun og_mint<T: store, NFT: key+store>(bobyard: &mut BobYardLaunchpad, launch_id:ID, _proof:vector<vector<u8>>, num:u64, ctx:&mut TxContext) {
         let receiver_addr = tx_context::sender(ctx);
-        //let now =
 
         let launchpad = ofield::borrow_mut<ID,LanchNFT<NFT>>(&mut bobyard.id,launch_id);
         // assert!(merkle_proof::verify(&proof, launch_data.merkle_root, hash::sha2_256(bcs::to_bytes(&receiver_addr))),INVALID_PROOF);
@@ -179,8 +176,8 @@ module bob::launchpad {
         // };
     }
 
-    public entry fun pre_mint(bobyard: &mut BobYardLaunchpad, launch_id:ID, proof:vector<u8>, num:u64, ctx:&mut TxContext) {}
-    public entry fun public_mint(bobyard: &mut BobYardLaunchpad, launch_id:ID, num:u64, ctx:&mut TxContext) {}
+    // public entry fun pre_mint(bobyard: &mut BobYardLaunchpad, launch_id:ID, proof:vector<u8>, num:u64, ctx:&mut TxContext) {}
+    // public entry fun public_mint(bobyard: &mut BobYardLaunchpad, launch_id:ID, num:u64, ctx:&mut TxContext) {}
 
     fun mint_random<NFT: key+store>(recver:address,lanchpad: &mut LanchNFT<NFT>,ctx:&mut TxContext) {
         let nft = collectible::mint<NFT>(&mut lanchpad.mint_cap,lanchpad.img_url,

@@ -1,4 +1,4 @@
-module bob::bobmarket {
+module bob::BobYard {
     use sui::dynamic_object_field as ofield;
     use sui::tx_context::{Self, TxContext};
     use sui::object::{Self, ID, UID};
