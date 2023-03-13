@@ -1,10 +1,10 @@
 module bob::launchpad {
-    use std::hash;
+
     use std::option::{Option, some, none};
     use std::string::{Self, String};
-    use std::vector;
 
-    use sui::bcs::{peel_u64, Self};
+    use bob::utils::num_str;
+    use sui::bcs;
     use sui::clock::{Self, Clock};
     use sui::coin::{Coin, zero, value, split};
     use sui::collectible::{Self, CollectionCreatorCap, Collectible};
@@ -65,7 +65,7 @@ module bob::launchpad {
         public_sale_end_time: u64,
 
         paused: bool,
-        mint_random:bool,
+        mint_random: bool,
 
         minted_wallet: vec_map::VecMap<address, u64>,
         mint_cap: CollectionCreatorCap<NFT>
@@ -96,13 +96,13 @@ module bob::launchpad {
         website: Option<String>,
         url: Option<String>,
         img_url: String,
-        img_suffix:String,
+        img_suffix: String,
         description: String,
         creater: address,
         royalt: u64,
         royalt_point: u64,
         supply: u64,
-        mint_random:bool,
+        mint_random: bool,
         og_mint_amount: Option<u64>,
         og_mint_proce: Option<u64>,
         og_mint_time: Option<u64>,
@@ -118,6 +118,8 @@ module bob::launchpad {
         mint_cap: CollectionCreatorCap<NFT>,
         ctx: &mut TxContext,
     ) {
+        //TODO check The sender is on the white list
+
         let lanch = LanchNFT<NFT, M> {
             id: object::new(ctx),
             name,
@@ -245,49 +247,5 @@ module bob::launchpad {
 
         collectible::mint<NFT>(&mut launch_data.mint_cap, baseuri,
             some(token_name), none<String>(), some(string::utf8(bcs::to_bytes(&launch_data.creater))), none(), ctx)
-    }
-
-    // utils
-    fun num_str(num: u64): String
-    {
-        let v1 = vector::empty();
-        while (num / 10 > 0) {
-            let rem = num % 10;
-            vector::push_back(&mut v1, (rem + 48 as u8));
-            num = num / 10;
-        };
-        vector::push_back(&mut v1, (num + 48 as u8));
-        vector::reverse(&mut v1);
-        string::utf8(v1)
-    }
-
-    fun pseudo_random(add: address, remaining: u64,ctx:&mut TxContext): u64
-    {
-        let x = bcs::to_bytes<address>(&add);
-        let y = bcs::to_bytes<u64>(&remaining);
-
-        let uid = object::new(ctx);
-        let z = bcs::to_bytes<UID>(&uid);
-        object::delete(uid);
-
-        vector::append(&mut x, y);
-        vector::append(&mut x, z);
-        let tmp = hash::sha2_256(x);
-        let data = vector::empty<u8>();
-        let i = 24;
-        while (i < 32)
-            {
-                let x = vector::borrow(&tmp, i);
-                vector::append(&mut data, vector<u8>[*x]);
-                i = i + 1;
-            };
-
-        assert!(remaining > 0, 999);
-        let random = peel_u64(&mut bcs::new(data)) % remaining + 1;
-        if (random == 0)
-            {
-                random = 1;
-            };
-        random
     }
 }

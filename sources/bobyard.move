@@ -1,14 +1,11 @@
 module bob::BobYard {
-    use sui::dynamic_object_field as ofield;
-    use sui::tx_context::{Self, TxContext};
-    use sui::object::{Self, ID, UID};
+    use bob::events::{EmitCreateMarketEvent, EmitListEvent, EmitDeListEvent, EmitBuyEvent, EmitAcceptOfferEvent, EmitOfferEvent, EmitCancelOfferEvent};
     use sui::coin::{Coin, Self};
-    use sui::transfer;
-    use sui::event;
-    use sui::event::emit;
     use sui::collectible::Collectible;
-    use std::ascii::String;
-    use std::type_name;
+    use sui::dynamic_object_field as ofield;
+    use sui::object::{Self, ID, UID};
+    use sui::transfer;
+    use sui::tx_context::{Self, TxContext};
 
     const EAmountIncorrect: u64 = 0;
     const ENotOwner: u64 = 1;
@@ -34,7 +31,7 @@ module bob::BobYard {
 
     struct Offers has key, store {
         id: UID,
-        item_id: ID,
+        list_id: ID,
         expire_time: u64,
         owner: address,
     }
@@ -42,66 +39,6 @@ module bob::BobYard {
     struct Items<T> has key, store {
         id: UID,
         items: vector<T>,
-    }
-
-    struct MarketCreateEvent has copy, drop {
-        id: ID,
-        offer_id: ID,
-    }
-
-    struct ListEvent has copy, drop {
-        list_id: ID,
-        list_type: String,
-        coin_type: String,
-        ask: u64,
-        owner: address,
-    }
-
-    struct DeListEvent has copy, drop {
-        list_id: ID,
-        list_type: String,
-        coin_type: String,
-        ask: u64,
-        owner: address,
-    }
-
-    struct BuyEvent has copy, drop {
-        list_id: ID,
-        ask: u64,
-        list_type: String,
-        coin_type: String,
-        owner: address,
-        buyer: address,
-    }
-
-    struct AcceptOfferEvent has copy, drop {
-        offer_id: ID,
-        list_id: ID,
-        list_type: String,
-        coin_type: String,
-        offer_type: String,
-        offer_amount: u64,
-        owner: address,
-        buyer: address,
-    }
-
-    struct OfferEvent has copy, drop {
-        offer_id: ID,
-        list_id: ID,
-        offer_type: String,
-        offer_amount: u64,
-        coin_type: String,
-        expire_time: u64,
-        owner: address,
-    }
-
-    struct CancelOfferEvent has copy, drop {
-        offer_id: ID,
-        list_id: ID,
-        offer_type: String,
-        offer_amount: u64,
-        coin_type: String,
-        owner: address,
     }
 
 
@@ -115,10 +52,7 @@ module bob::BobYard {
         let id = object::new(ctx);
         let offer_id = object::new(ctx);
 
-        emit(MarketCreateEvent {
-            id: object::uid_to_inner(&id),
-            offer_id: object::uid_to_inner(&offer_id),
-        });
+        EmitCreateMarketEvent(&id, &offer_id);
 
         transfer::share_object(Marketplace<MKTYPE> { id, offer_id, owner: tx_context::sender(ctx) })
     }
@@ -142,13 +76,7 @@ module bob::BobYard {
         ofield::add(&mut listing.id, true, item);
         ofield::add(&mut marketplace.id, list_id, listing);
 
-        event::emit(ListEvent {
-            list_id,
-            list_type: type_name::into_string(type_name::get<Collectible<T>>()),
-            coin_type: type_name::into_string(type_name::get<Coin<MKTYPE>>()),
-            ask,
-            owner,
-        })
+        EmitListEvent<T, MKTYPE>(list_id, ask, owner)
     }
 
     public entry fun delist<T: key + store, MKTYPE>(
@@ -168,16 +96,10 @@ module bob::BobYard {
         transfer::transfer(item, owner);
         object::delete(id);
 
-        emit(DeListEvent {
-            list_id: item_id,
-            list_type: type_name::into_string(type_name::get<Collectible<T>>()),
-            coin_type: type_name::into_string(type_name::get<Coin<MKTYPE>>()),
-            ask,
-            owner,
-        })
+        EmitDeListEvent<T, MKTYPE>(item_id, ask, owner)
     }
 
-    public fun buy<T: key + store, MKTYPE>(
+    fun buy<T: key + store, MKTYPE>(
         marketplace: &mut Marketplace<MKTYPE>,
         item_id: ID,
         paid: Coin<MKTYPE>,
@@ -192,14 +114,7 @@ module bob::BobYard {
         let buyer = tx_context::sender(ctx);
         assert!(buyer != owner, EBuyerCanBeSeller);
 
-        emit(BuyEvent {
-            list_id: item_id,
-            list_type: type_name::into_string(type_name::get<Collectible<T>>()),
-            coin_type: type_name::into_string(type_name::get<Coin<MKTYPE>>()),
-            ask,
-            owner,
-            buyer,
-        });
+        EmitBuyEvent<T, MKTYPE>(item_id, ask, owner, buyer);
 
         let item: Collectible<T> = ofield::remove(&mut id, true);
         object::delete(id);
@@ -251,7 +166,7 @@ module bob::BobYard {
         let Listing {
             id: list_uid,
             owner,
-            ask: _,
+            ask,
         } = ofield::remove(&mut marketplace.id, list_id);
 
         assert!(sender == owner, ENotOwner);
@@ -259,7 +174,7 @@ module bob::BobYard {
         //for buyer
         let Offers {
             id: offer_uid,
-            item_id,
+            list_id,
             expire_time: _,
             owner: buyer,
         } = ofield::remove(&mut marketplace.offer_id, offer_id);
@@ -274,21 +189,13 @@ module bob::BobYard {
         transfer::transfer(list_item, buyer);
 
         //emit event
-        emit(AcceptOfferEvent {
-            offer_id,
-            list_id: item_id,
-            list_type: type_name::into_string(type_name::get<Collectible<BuyItem>>()),
-            coin_type: type_name::into_string(type_name::get<Coin<COIN>>()),
-            offer_type: type_name::into_string(type_name::get<SellItem>()),
-            offer_amount: 0,
-            owner,
-            buyer,
-        });
+        EmitAcceptOfferEvent<BuyItem, SellItem, COIN>(offer_id, list_id, owner, buyer, ask)
     }
+
 
     public entry fun make_offer<T: key + store, MKTYPE>(
         marketplace: &mut Marketplace<MKTYPE>,
-        item_id: ID,
+        list_id: ID,
         paid: T,
         expire_time: u64,
         ctx: &mut TxContext)
@@ -298,7 +205,7 @@ module bob::BobYard {
         let id = object::id(&paid);
         let offer = Offers {
             id: object::new(ctx),
-            item_id,
+            list_id,
             expire_time,
             owner
         };
@@ -306,13 +213,7 @@ module bob::BobYard {
         ofield::add(&mut offer.id, true, paid);
         ofield::add(&mut marketplace.offer_id, id, offer);
 
-        emit(OfferEvent {
-            offer_id: id, list_id: item_id,
-            offer_type: type_name::into_string(type_name::get<Coin<MKTYPE>>()),
-            coin_type: type_name::into_string(type_name::get<T>()),
-            offer_amount: 0,
-            expire_time, owner
-        })
+        EmitOfferEvent<T, MKTYPE>(id, list_id, 0, expire_time, owner)
     }
 
     public entry fun cancel_offer<T: key + store, MKTYPE>(
@@ -322,7 +223,7 @@ module bob::BobYard {
     ) {
         let Offers {
             id,
-            item_id,
+            list_id,
             expire_time: _,
             owner,
         } = ofield::remove(&mut marketplace.offer_id, offer_id);
@@ -330,17 +231,8 @@ module bob::BobYard {
 
         let item: T = ofield::remove(&mut id, true);
         transfer::transfer(item, owner);
-
+        object::delete(id);
         //emit event
-        emit(CancelOfferEvent {
-            offer_id,
-            list_id: item_id,
-            offer_type: type_name::into_string(type_name::get<Coin<MKTYPE>>()),
-            coin_type: type_name::into_string(type_name::get<T>()),
-            offer_amount: 0,
-            owner,
-        });
-
-        object::delete(id)
+        EmitCancelOfferEvent<T, MKTYPE>(offer_id, list_id, owner)
     }
 }
