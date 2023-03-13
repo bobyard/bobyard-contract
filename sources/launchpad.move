@@ -1,22 +1,27 @@
 module bob::launchpad {
+    use std::hash;
     use std::option::{Option, some, none};
-    use std::string::String;
-    use sui::collectible::CollectionCreatorCap;
-    use sui::tx_context::TxContext;
-    use sui::vec_map;
-    use sui::object::{UID, ID};
-    use sui::object;
-    use sui::dynamic_object_field as ofield;
-    use sui::transfer::share_object;
-    use sui::tx_context;
-    use sui::vec_set::VecSet;
-    use sui::vec_set;
-    use sui::collectible;
-    use sui::transfer;
-    use std::string;
-    use std::bcs;
+    use std::string::{Self, String};
+    use std::vector;
 
-    const EINVALID_AMOUNT:u64 = 0;
+    use sui::bcs::{peel_u64, Self};
+    use sui::clock::{Self, Clock};
+    use sui::coin::{Coin, zero, value, split};
+    use sui::collectible::{Self, CollectionCreatorCap, Collectible};
+    use sui::dynamic_object_field as ofield;
+    use sui::object::{Self, UID, ID};
+    use sui::pay::join_vec;
+    use sui::transfer::{Self, share_object};
+    use sui::tx_context::{Self, TxContext};
+    use sui::vec_map;
+    use sui::vec_set::{Self, VecSet};
+
+    const EINVALID_AMOUNT: u64 = 0;
+    const EINVALID_PROOF: u64 = 1;
+    const EPAUSED: u64 = 2;
+    const ESOLD_OUT: u64 = 3;
+    const ESALE_NOT_STARTED: u64 = 4;
+    const EINVALID_COINS: u64 = 5;
 
     struct Admin has key {
         id: UID,
@@ -30,13 +35,14 @@ module bob::launchpad {
         partner: VecSet<address>,
     }
 
-    struct LanchNFT<phantom NFT: key+store> has key, store {
+    struct LanchNFT<phantom NFT: key+store, phantom M> has key, store {
         id: UID,
-        name: Option<String>,
+        name: String,
         website: Option<String>,
         url: Option<String>,
         img_url: String,
-        description:String,
+        img_suffix: String,
+        description: String,
         creater: address,
         royalt: u64,
         royalt_point: u64,
@@ -59,6 +65,8 @@ module bob::launchpad {
         public_sale_end_time: u64,
 
         paused: bool,
+        mint_random:bool,
+
         minted_wallet: vec_map::VecMap<address, u64>,
         mint_cap: CollectionCreatorCap<NFT>
     }
@@ -82,17 +90,19 @@ module bob::launchpad {
         share_object(admin);
     }
 
-    public fun init_launchpad<NFT: key+store>(
+    public fun init_launchpad<NFT: key+store, M: key+store>(
         bobyard: &mut BobYardLaunchpad,
-        name: Option<String>,
+        name: String,
         website: Option<String>,
         url: Option<String>,
         img_url: String,
-        description:String,
+        img_suffix:String,
+        description: String,
         creater: address,
         royalt: u64,
         royalt_point: u64,
         supply: u64,
+        mint_random:bool,
         og_mint_amount: Option<u64>,
         og_mint_proce: Option<u64>,
         og_mint_time: Option<u64>,
@@ -108,12 +118,13 @@ module bob::launchpad {
         mint_cap: CollectionCreatorCap<NFT>,
         ctx: &mut TxContext,
     ) {
-        let lanch = LanchNFT<NFT> {
+        let lanch = LanchNFT<NFT, M> {
             id: object::new(ctx),
             name,
             website,
             url,
             img_url,
+            img_suffix,
             description,
             creater,
             royalt,
@@ -133,19 +144,27 @@ module bob::launchpad {
             public_sale_mint_time,
             public_sale_end_time,
             paused: false,
+            mint_random,
             minted_wallet: vec_map::empty<address, u64>(),
             mint_cap,
         };
 
         let id = object::id(&lanch);
-        //event here
+        //TODO event emit
+
         ofield::add(&mut bobyard.id, id, lanch);
     }
 
-    public entry fun og_mint<T: store, NFT: key+store>(bobyard: &mut BobYardLaunchpad, launch_id:ID, _proof:vector<vector<u8>>, num:u64, ctx:&mut TxContext) {
-        let receiver_addr = tx_context::sender(ctx);
+    public entry fun og_mint<T: store, NFT: key+store, M: key+store>(
+        bobyard: &mut BobYardLaunchpad,
+        launch_id: ID,
+        _proof: vector<vector<u8>>,
+        num: u64,
+        ctx: &mut TxContext
+    ) {
+        let sender_address = tx_context::sender(ctx);
+        let launchpad = ofield::borrow_mut<ID, LanchNFT<NFT, M>>(&mut bobyard.id, launch_id);
 
-        let launchpad = ofield::borrow_mut<ID,LanchNFT<NFT>>(&mut bobyard.id,launch_id);
         // assert!(merkle_proof::verify(&proof, launch_data.merkle_root, hash::sha2_256(bcs::to_bytes(&receiver_addr))),INVALID_PROOF);
         // assert!(number <= launch_data.presale_mint_price, INVALID_AMOUNT);
         // assert!(launch_data.paused == false, EPAUSED);
@@ -153,19 +172,19 @@ module bob::launchpad {
         // assert!(now > launch_data.presale_mint_time, ESALE_NOT_STARTED);
 
         // check already minted.
-        if (vec_map::contains(&launchpad.minted_wallet, &receiver_addr)) {
-            let mint_by_receiver = vec_map::get_mut(&mut launchpad.minted_wallet, &receiver_addr);
+        if (vec_map::contains(&launchpad.minted_wallet, &sender_address)) {
+            let mint_by_receiver = vec_map::get_mut(&mut launchpad.minted_wallet, &sender_address);
             assert!(*mint_by_receiver + num <= launchpad.public_mint_amount, EINVALID_AMOUNT);
             *mint_by_receiver = *mint_by_receiver + num;
         } else {
-            vec_map::insert(&mut launchpad.minted_wallet, receiver_addr, num);
+            vec_map::insert(&mut launchpad.minted_wallet, sender_address, num);
         };
 
         let i = 0;
         while (i < num) {
-            mint_random(receiver_addr, launchpad,ctx);
-
-            i =i+1;
+            transfer::transfer(mint(launchpad, false, ctx), sender_address);
+            launchpad.minted = launchpad.minted + 1;
+            i = i + 1;
         };
 
 
@@ -176,12 +195,99 @@ module bob::launchpad {
         // };
     }
 
-    // public entry fun pre_mint(bobyard: &mut BobYardLaunchpad, launch_id:ID, proof:vector<u8>, num:u64, ctx:&mut TxContext) {}
-    // public entry fun public_mint(bobyard: &mut BobYardLaunchpad, launch_id:ID, num:u64, ctx:&mut TxContext) {}
+    public entry fun public_mint<T: store, NFT: key+store, M: key+store>(
+        bobyard: &mut BobYardLaunchpad,
+        launch_id: ID,
+        coins: vector<Coin<M>>,
+        num: u64,
+        clock: &Clock,
+        ctx: &mut TxContext
+    ) {
+        let sender_address = tx_context::sender(ctx);
+        let launchpad = ofield::borrow_mut<ID, LanchNFT<NFT, M>>(&mut bobyard.id, launch_id);
+        let now = clock::timestamp_ms(clock);
 
-    fun mint_random<NFT: key+store>(recver:address,lanchpad: &mut LanchNFT<NFT>,ctx:&mut TxContext) {
-        let nft = collectible::mint<NFT>(&mut lanchpad.mint_cap,lanchpad.img_url,
-            lanchpad.name,none<String>(),some(string::utf8(bcs::to_bytes(&lanchpad.creater))),none(),ctx);
-        transfer::transfer(nft,recver);
+        assert!(launchpad.public_mint_amount < num, EINVALID_AMOUNT);
+        assert!(launchpad.paused == false, EPAUSED);
+        assert!(launchpad.minted != launchpad.supply, ESOLD_OUT);
+        assert!(now > launchpad.public_sale_mint_time, ESALE_NOT_STARTED);
+
+        let paids = zero<M>(ctx);
+        join_vec(&mut paids, coins);
+        assert!(value(&mut paids) > num * launchpad.public_mint_price, EINVALID_COINS);
+        let paid = split(&mut paids, num * launchpad.public_mint_price, ctx);
+        //TODO We take launchfee or not?
+        transfer::transfer(paid, launchpad.creater);
+
+        let i: u64 = 0;
+        while (i < num) {
+            transfer::transfer(mint(launchpad, false, ctx), sender_address);
+            launchpad.minted = launchpad.minted + 1;
+            i = i + 1;
+        };
+
+        transfer::transfer(paids, sender_address)
+    }
+
+    fun mint<NFT: key+store, M: key+store>(
+        launch_data: &mut LanchNFT<NFT, M>,
+        is_random: bool,
+        ctx: &mut TxContext
+    ): Collectible<NFT> {
+        let mint_position = launch_data.minted + 1;
+
+        let baseuri = launch_data.img_url;
+        string::append(&mut baseuri, num_str(mint_position));
+        let token_name = launch_data.name;
+        string::append(&mut token_name, string::utf8(b" #"));
+        string::append(&mut token_name, num_str(mint_position));
+        string::append(&mut baseuri, launch_data.img_suffix);
+
+        collectible::mint<NFT>(&mut launch_data.mint_cap, baseuri,
+            some(token_name), none<String>(), some(string::utf8(bcs::to_bytes(&launch_data.creater))), none(), ctx)
+    }
+
+    // utils
+    fun num_str(num: u64): String
+    {
+        let v1 = vector::empty();
+        while (num / 10 > 0) {
+            let rem = num % 10;
+            vector::push_back(&mut v1, (rem + 48 as u8));
+            num = num / 10;
+        };
+        vector::push_back(&mut v1, (num + 48 as u8));
+        vector::reverse(&mut v1);
+        string::utf8(v1)
+    }
+
+    fun pseudo_random(add: address, remaining: u64,ctx:&mut TxContext): u64
+    {
+        let x = bcs::to_bytes<address>(&add);
+        let y = bcs::to_bytes<u64>(&remaining);
+
+        let uid = object::new(ctx);
+        let z = bcs::to_bytes<UID>(&uid);
+        object::delete(uid);
+
+        vector::append(&mut x, y);
+        vector::append(&mut x, z);
+        let tmp = hash::sha2_256(x);
+        let data = vector::empty<u8>();
+        let i = 24;
+        while (i < 32)
+            {
+                let x = vector::borrow(&tmp, i);
+                vector::append(&mut data, vector<u8>[*x]);
+                i = i + 1;
+            };
+
+        assert!(remaining > 0, 999);
+        let random = peel_u64(&mut bcs::new(data)) % remaining + 1;
+        if (random == 0)
+            {
+                random = 1;
+            };
+        random
     }
 }
