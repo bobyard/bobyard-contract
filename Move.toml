@@ -3,7 +3,7 @@ name = "BobYard"
 version = "0.0.2"
 
 [dependencies]
-Sui = { local = "/home/yusong/works/cargo_workes/sui/crates/sui-framework" }
+Sui = { local = "/home/yusong/works/cargo_workes/new-bobyard-sui/crates/sui-framework/packages/sui-framework" }
 
 [addresses]
 bob =  "0x0"

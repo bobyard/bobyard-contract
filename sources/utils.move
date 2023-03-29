@@ -100,4 +100,6 @@ module bob::utils {
         vector::append(&mut a, b);
         hash::sha2_256(a)
     }
+
+
 }

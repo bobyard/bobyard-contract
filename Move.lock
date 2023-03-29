@@ -9,11 +9,11 @@ dependencies = [
 
 [[move.package]]
 name = "MoveStdlib"
-source = { local = "/home/yusong/works/cargo_workes/sui/crates/sui-framework/deps/move-stdlib" }
+source = { local = "/home/yusong/works/cargo_workes/new-bobyard-sui/crates/sui-framework/packages/move-stdlib" }
 
 [[move.package]]
 name = "Sui"
-source = { local = "/home/yusong/works/cargo_workes/sui/crates/sui-framework" }
+source = { local = "/home/yusong/works/cargo_workes/new-bobyard-sui/crates/sui-framework/packages/sui-framework" }
 
 dependencies = [
   { name = "MoveStdlib" },
