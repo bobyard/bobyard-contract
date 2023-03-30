@@ -1,4 +1,4 @@
-module bob::utils {
+module bob::Utils {
     use std::hash;
     use std::string::{Self, String};
     use std::vector;

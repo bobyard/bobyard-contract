@@ -1,4 +1,4 @@
-module bob::events {
+module bob::Events {
     use std::type_name;
 
     use sui::event::emit;

@@ -1,13 +1,15 @@
 module bob::BobYard {
     use bob::Admin;
-    use bob::events::{EmitCreateMarketEvent, EmitListEvent, EmitDeListEvent, EmitBuyEvent, EmitAcceptOfferEvent, EmitOfferEvent, EmitCancelOfferEvent};
+    use bob::Events::{EmitCreateMarketEvent, EmitListEvent, EmitDeListEvent};
     use sui::clock;
-    use sui::coin::{Coin, Self};
-    use sui::dynamic_object_field as ofield;
+    use sui::dynamic_object_field as dyn;
     use sui::object::{Self, ID, UID};
     use sui::transfer::{Self, public_transfer};
     use sui::tx_context::{Self, TxContext};
-    use std::vector;
+
+    //TODO create market.move
+    //TODO crate offer.move
+    //TODO crate launchpad.move
 
     const EAmountIncorrect: u64 = 0;
     const ENotOwner: u64 = 1;
@@ -23,9 +25,9 @@ module bob::BobYard {
         fee_point: u64,
     }
 
-    struct Listing has key, store {
+    struct Listing<phantom WANT: key+store> has key, store {
         id: UID,
-        item_length:u64,
+        item_length: u64,
         ask_coin: u64,
         ask_item: u64,
         expiration: u64,
@@ -49,49 +51,74 @@ module bob::BobYard {
 
     public entry fun list<T, SELL: key + store, WANT: key+store>(
         marketplace: &mut Makret<T>,
-        items: vector<SELL>,
+        item: vector<SELL>,
         ask_coin: u64,
         ask_item: u64,
         expiration: u64,
         time: &clock::Clock,
         ctx: &mut TxContext
     ) {
-        assert!(ask_coin == 0 && ask_item == 0, EAskAmountAndItemBothZero);
-        assert!(clock::timestamp_ms(time) < expiration, EExpired);
+        assert!(ask_coin != 0 || ask_item != 0, EAskAmountAndItemBothZero);
+        assert!(clock::timestamp_ms(time) >= expiration, EExpired);
 
         let owner = tx_context::sender(ctx);
-        let listing = Listing {
+        let listing = Listing<WANT> {
             id: object::new(ctx),
             ask_coin,
             ask_item,
             expiration,
             owner,
-            item_length:0,
+            item_length: 0,
         };
 
-        //todo let event object_ids = [];
+        // todo let event object_ids = [];
         let list_id = object::id(&listing);
         let item_length = 0;
-        let put_len = vector::length(&items);
-        while (item_length < put_len) {
-            ofield::add(&mut listing.id, item_length, vector::pop_back(&mut items));
-            //TODO add item object id. let frentend can see it
-            item_length = item_length +1;
-        };
-        vector::destroy_empty(items);
+        // let put_len = vector::length(&items);
+        // while (item_length < put_len) {
+        //     dyn::add(&mut listing.id, item_length, vector::pop_back(&mut items));
+        //     //TODO add item object id. let frentend can see it
+        //     item_length = item_length +1;
+        // };
+        // vector::destroy_empty(items);
+        dyn::add(&mut listing.id, item_length, item);
+        listing.item_length = item_length + 1;
 
-        listing.item_length = item_length;
-        ofield::add(&mut marketplace.id, list_id, listing);
-
+        dyn::add(&mut marketplace.id, list_id, listing);
         EmitListEvent<SELL, T>(list_id, ask_coin, owner)
     }
 
-    //TODO put more intm in the listing
+    public entry fun add_item<T, SELL: key + store, WANT: key+store>(
+        marketplace: &mut Makret<T>,
+        list_id: ID,
+        item: SELL,
+        ctx: &mut TxContext
+    ) {
+        let sender = tx_context::sender(ctx);
+        let list = dyn::borrow_mut<ID,Listing<WANT>>(&mut marketplace.id, list_id);
+        assert!(list.owner == sender,ENotOwner);
+        let item_length = list.item_length;
+        dyn::add(&mut list.id, item_length, item);
+        list.item_length = list.item_length +1;
+    }
 
+    public entry fun remove_item<T, SELL: key + store, WANT: key+store>(
+        marketplace: &mut Makret<T>,
+        list_id: ID,
+        item_index: u64,
+        ctx: &mut TxContext
+    ) {
+        let sender = tx_context::sender(ctx);
+        let list = dyn::borrow_mut<ID,Listing<WANT>>(&mut marketplace.id, list_id);
+        assert!(list.owner == sender,ENotOwner);
+        let item:SELL = dyn::remove(&mut list.id, item_index);
+        public_transfer(item,sender);
+        list.item_length = list.item_length -1;
+    }
 
-    public entry fun delist<T: key + store, MKTYPE>(
-        marketplace: &mut Makret<MKTYPE>,
-        item_id: ID,
+    public entry fun delist<T, SELL: key + store,WANT:key+store>(
+        marketplace: &mut Makret<T>,
+        list_id: ID,
         ctx: &mut TxContext
     ) {
         let Listing {
@@ -101,21 +128,22 @@ module bob::BobYard {
             ask_item,
             expiration,
             owner,
-        } = ofield::remove(&mut marketplace.id, item_id);
+        }:Listing<WANT> = dyn::remove(&mut marketplace.id, list_id);
 
         assert!(tx_context::sender(ctx) == owner, ENotOwner);
 
-        let length = 0;
-        while (length < item_length) {
-            let item:T = ofield::remove(&mut id, length);
-            public_transfer(item, owner);
-
-            length = length +1;
-        };
-
+        // let length = 0;
+        // while (length < item_length) {
+        //     let item:SELL = dyn::remove(&mut id, length);
+        //     public_transfer(item, owner);
+        //
+        //     length = length +1;
+        // };
+        let item: SELL = dyn::remove(&mut id, 0);
+        public_transfer(item, owner);
 
         object::delete(id);
-        EmitDeListEvent<T, MKTYPE>(item_id, ask_coin, owner)
+        EmitDeListEvent<SELL, T>(list_id, ask_coin, owner)
     }
     //
     // fun buy<T: key + store, MKTYPE>(
