@@ -1,11 +1,9 @@
 module bob::Events {
     use std::type_name;
-
     use sui::event::emit;
     use sui::object::{Self, ID, UID};
 
     friend bob::BobYard;
-
 
     struct MarketCreateEvent has copy, drop {
         id: ID,

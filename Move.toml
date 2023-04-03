@@ -1,6 +1,6 @@
 [package]
 name = "BobYard"
-version = "0.0.2"
+version = "0.0.3"
 
 [dependencies]
 Sui = { local = "../bobyard-sui/crates/sui-framework/packages/sui-framework" }

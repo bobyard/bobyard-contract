@@ -55,7 +55,7 @@ module bob::BobYard {
         market.fee = fee
     }
 
-    public entry fun list_one<T, SELL: key + store, WANT: key+store>(
+    public entry fun list_one<T, WANT: key+store,SELL: key + store>(
         marketplace: &mut Makret<T>,
         item: SELL,
         ask_coin: u64,
@@ -118,8 +118,8 @@ module bob::BobYard {
         pay::join_vec(&mut paid,coins);
         let sender = tx_context::sender(ctx);
         let list = dyn::borrow_mut<ID,Listing<WANT>>(&mut marketplace.id, list_id);
-        assert!(list.owner != sender, EBuyerCanNotBeSeller);
-        assert!(list.item_length == 0,ENotEmptyCanNotBeDelist);
+        assert!(list.owner != sender,  EBuyerCanNotBeSeller);
+        assert!(list.item_length > 0, ENotEmptyCanNotBeDelist);
         assert!(list.ask_coin <= coin::value(&paid), EAmountIncorrect);
         let income = coin::split(&mut paid, list.ask_coin,ctx);
         public_transfer(income,sender);
@@ -219,10 +219,7 @@ module bob::BobYard {
             expiration:_,
             owner,
         }:Listing<WANT> = dyn::remove(&mut marketplace.id, list_id);
-
-        assert!(tx_context::sender(ctx) == owner, ENotOwner);
         assert!(item_length==0,ENotEmptyCanNotBeDelist);
-        assert!(!dyn::exists_(&mut id, 0),ENotEmptyCanNotBeDelist);
         object::delete(id);
         EmitDeListEvent<SELL, T>(list_id, ask_coin, owner)
     }
