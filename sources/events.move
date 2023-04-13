@@ -10,9 +10,10 @@ module bob::Events {
         offer_id: ID,
     }
 
-    struct ListEvent has copy, drop {
+    struct ListEvent<phantom WANT: key+store> has copy, drop {
         list_id: ID,
-        list_type: type_name::TypeName,
+        lists_ids: vector<ID>,
+        want_items:u64,
         coin_type: type_name::TypeName,
         ask: u64,
         owner: address,
@@ -20,10 +21,8 @@ module bob::Events {
 
     struct DeListEvent has copy, drop {
         list_id: ID,
-        list_type: type_name::TypeName,
-        coin_type: type_name::TypeName,
-        ask: u64,
-        owner: address,
+        list_ids:vector<ID>,
+        coin_type: type_name::TypeName
     }
 
     struct BuyEvent has copy, drop {
@@ -72,23 +71,22 @@ module bob::Events {
     }
 
 
-    public(friend) fun EmitListEvent<T: key + store, MKTYPE>(list_id: ID, ask: u64, owner: address) {
-        emit(ListEvent {
+    public(friend) fun EmitListEvent<WANT: key + store, MKTYPE>(list_id: ID,ids:vector<ID>,want_items:u64, ask: u64, owner: address) {
+        emit(ListEvent<WANT> {
             list_id,
-            list_type: type_name::get<T>(),
+            lists_ids:ids,
+            want_items,
             coin_type: type_name::get<MKTYPE>(),
             ask,
             owner,
         })
     }
 
-    public(friend) fun EmitDeListEvent<T: key + store, MKTYPE>(list_id: ID, ask: u64, owner: address) {
+    public(friend) fun EmitDeListEvent<MKTYPE>(list_id: ID,ids:vector<ID>) {
         emit(DeListEvent {
             list_id,
-            list_type: type_name::get<T>(),
+            list_ids: ids,
             coin_type: type_name::get<MKTYPE>(),
-            ask,
-            owner,
         })
     }
 
