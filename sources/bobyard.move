@@ -1,23 +1,19 @@
-module bob::BobYard {
-    use bob::events::{EmitCreateMarketEvent, EmitListEvent, EmitDeListEvent, EmitBuyEvent, EmitAcceptOfferEvent, EmitOfferEvent, EmitCancelOfferEvent};
+module bob::bobYard {
+    //use bob::events::{EmitCreateMarketEvent, EmitListEvent, EmitDeListEvent, EmitBuyEvent, EmitAcceptOfferEvent, EmitOfferEvent, EmitCancelOfferEvent};
     use sui::coin::{Coin, Self};
-    use sui::collectible::Collectible;
-    use sui::dynamic_object_field as ofield;
+    use sui::dynamic_object_field as dyn;
     use sui::object::{Self, ID, UID};
     use sui::transfer;
     use sui::tx_context::{Self, TxContext};
+    use bob::admin::{Manage, is_admin};
+    use sui::transfer::public_transfer;
 
     const EAmountIncorrect: u64 = 0;
     const ENotOwner: u64 = 1;
     const EEmptyObjects: u64 = 2;
     const EBuyerCanBeSeller: u64 = 3;
 
-    struct Admin has key {
-        id: UID,
-        owner: address,
-    }
-
-    struct Marketplace<phantom T> has key {
+    struct BobYardMakret<phantom T> has key {
         id: UID,
         offer_id: UID,
         owner: address
@@ -29,42 +25,28 @@ module bob::BobYard {
         owner: address,
     }
 
-    struct Offers has key, store {
+    struct Offer has key, store {
         id: UID,
         list_id: ID,
         expire_time: u64,
         owner: address,
     }
 
-    struct Items<T> has key, store {
-        id: UID,
-        items: vector<T>,
-    }
-
-
-    fun init(ctx: &mut TxContext) {
-        transfer::share_object(Admin { id: object::new(ctx), owner: tx_context::sender(ctx) })
-    }
-
-    public entry fun create<MKTYPE>(admin: &Admin, ctx: &mut TxContext) {
-        assert!(tx_context::sender(ctx) == admin.owner, ENotOwner);
-
+    public entry fun create<T>(manage: &Manage, ctx: &mut TxContext) {
+        assert!(is_admin(manage,ctx), ENotOwner);
         let id = object::new(ctx);
         let offer_id = object::new(ctx);
-
-        EmitCreateMarketEvent(&id, &offer_id);
-
-        transfer::share_object(Marketplace<MKTYPE> { id, offer_id, owner: tx_context::sender(ctx) })
+        //EmitCreateMarketEvent(&id, &offer_id);
+        transfer::share_object(BobYardMakret<T> { id, offer_id,owner:tx_context::sender(ctx)})
     }
 
-    public entry fun list<T: key + store, MKTYPE>(
-        marketplace: &mut Marketplace<MKTYPE>,
-        item: Collectible<T>,
+    public entry fun list<T,ITEM: key + store>(
+        marketplace: &mut BobYardMakret<T>,
+        item: ITEM,
         ask: u64,
         ctx: &mut TxContext
     ) {
-        let list_id = object::id(&mut item);
-
+        //let list_id = object::id(&mut item);
         let owner = tx_context::sender(ctx);
 
         let listing = Listing {
@@ -73,90 +55,52 @@ module bob::BobYard {
             owner,
         };
 
-        ofield::add(&mut listing.id, true, item);
-        ofield::add(&mut marketplace.id, list_id, listing);
+        let list_id = object::id(&listing);
 
-        EmitListEvent<T, MKTYPE>(list_id, ask, owner)
+        dyn::add(&mut listing.id, true, item);
+        dyn::add(&mut marketplace.id,list_id , listing);
+        //EmitListEvent(list_id, ask, owner)
     }
 
-    public entry fun delist<T: key + store, MKTYPE>(
-        marketplace: &mut Marketplace<MKTYPE>,
+    public entry fun delist<T,ITEM: key + store>(
+        marketplace: &mut BobYardMakret<T>,
         item_id: ID,
         ctx: &mut TxContext
     ) {
         let Listing {
             id,
             owner,
-            ask,
-        } = ofield::remove(&mut marketplace.id, item_id);
-
+            ask:_,
+        } = dyn::remove(&mut marketplace.id, item_id);
         assert!(tx_context::sender(ctx) == owner, ENotOwner);
 
-        let item: Collectible<T> = ofield::remove(&mut id, true);
-        transfer::transfer(item, owner);
+        let item: ITEM = dyn::remove(&mut id, true);
+        public_transfer(item, owner);
         object::delete(id);
-
-        EmitDeListEvent<T, MKTYPE>(item_id, ask, owner)
     }
 
-    fun buy<T: key + store, MKTYPE>(
-        marketplace: &mut Marketplace<MKTYPE>,
+    public entry fun buy_one<T,ITEM: key + store>(
+        marketplace: &mut BobYardMakret<T>,
         item_id: ID,
-        paid: Coin<MKTYPE>,
-        ctx: &mut TxContext
-    ): (Collectible<T>, Coin<MKTYPE>) {
-        let Listing {
-            id,
-            ask,
-            owner
-        } = ofield::remove(&mut marketplace.id, item_id);
-        assert!(ask < coin::value(&paid), EAmountIncorrect);
-        let buyer = tx_context::sender(ctx);
-        assert!(buyer != owner, EBuyerCanBeSeller);
-
-        EmitBuyEvent<T, MKTYPE>(item_id, ask, owner, buyer);
-
-        let item: Collectible<T> = ofield::remove(&mut id, true);
-        object::delete(id);
-
-        if (ask == coin::value(&paid)) {
-            transfer::transfer(paid, owner);
-            return (item, coin::zero<MKTYPE>(ctx))
-        } else {
-            let take = coin::split(&mut paid, ask, ctx);
-            transfer::transfer(take, owner);
-            return (item, paid)
-        }
-    }
-
-    public entry fun buy_one<T: key + store, COIN>(
-        marketplace: &mut Marketplace<COIN>,
-        item_id: ID,
-        paid: vector<Coin<COIN>>,
+        paid: Coin<T>,
         ctx: &mut TxContext
     ) {
-        use sui::pay::join_vec;
-        use sui::coin::zero;
         let sender = tx_context::sender(ctx);
+        let (item, c) = buy<T, ITEM>(marketplace, item_id, paid, ctx);
 
-        let to_mark_paid = zero<COIN>(ctx);
-        join_vec(&mut to_mark_paid, paid);
-
-        let (item, c) = buy<T, COIN>(marketplace, item_id, to_mark_paid, ctx);
-
-        transfer::transfer(
+        public_transfer(
             item,
             sender
         );
 
-        transfer::transfer(
+        public_transfer(
             c,
             sender,
         );
     }
 
-    public entry fun accept_offer<BuyItem: key+store, SellItem: key+store, COIN>(
-        marketplace: &mut Marketplace<COIN>,
+    public entry fun accept_offer<T,BuyItem: key+store, SellItem: key+store>(
+        marketplace: &mut BobYardMakret<T>,
         list_id: ID,
         offer_id: ID,
         ctx: &mut TxContext
@@ -167,72 +111,101 @@ module bob::BobYard {
             id: list_uid,
             owner,
             ask,
-        } = ofield::remove(&mut marketplace.id, list_id);
+        } = dyn::remove(&mut marketplace.id, list_id);
 
         assert!(sender == owner, ENotOwner);
 
         //for buyer
-        let Offers {
+        let Offer {
             id: offer_uid,
             list_id,
             expire_time: _,
             owner: buyer,
-        } = ofield::remove(&mut marketplace.offer_id, offer_id);
+        } = dyn::remove(&mut marketplace.offer_id, offer_id);
 
-        let paid: SellItem = ofield::remove(&mut offer_uid, true);
+        let paid: SellItem = dyn::remove(&mut offer_uid, true);
         object::delete(offer_uid);
-        transfer::transfer(paid, owner);
+        public_transfer(paid, owner);
 
         // for seller
-        let list_item: Collectible<BuyItem> = ofield::remove(&mut list_uid, true);
+        let list_item: BuyItem = dyn::remove(&mut list_uid, true);
         object::delete(list_uid);
-        transfer::transfer(list_item, buyer);
+        public_transfer(list_item, buyer);
 
-        //emit event
-        EmitAcceptOfferEvent<BuyItem, SellItem, COIN>(offer_id, list_id, owner, buyer, ask)
+        // emit event
+        // EmitAcceptOfferEvent<BuyItem, SellItem, COIN>(offer_id, list_id, owner, buyer, ask)
     }
 
-
-    public entry fun make_offer<T: key + store, MKTYPE>(
-        marketplace: &mut Marketplace<MKTYPE>,
+    public entry fun make_offer<T,ITEM: key + store>(
+        marketplace: &mut BobYardMakret<T>,
         list_id: ID,
-        paid: T,
+        paid: ITEM,
         expire_time: u64,
         ctx: &mut TxContext)
     {
         let owner = tx_context::sender(ctx);
 
         let id = object::id(&paid);
-        let offer = Offers {
+        let offer = Offer {
             id: object::new(ctx),
             list_id,
             expire_time,
             owner
         };
 
-        ofield::add(&mut offer.id, true, paid);
-        ofield::add(&mut marketplace.offer_id, id, offer);
+        dyn::add(&mut offer.id, true, paid);
+        dyn::add(&mut marketplace.offer_id, id, offer);
 
-        EmitOfferEvent<T, MKTYPE>(id, list_id, 0, expire_time, owner)
+        //EmitOfferEvent<T, MKTYPE>(id, list_id, 0, expire_time, owner)
     }
 
-    public entry fun cancel_offer<T: key + store, MKTYPE>(
-        marketplace: &mut Marketplace<MKTYPE>,
+    public entry fun cancel_offer<T,ITEM: key + store>(
+        marketplace: &mut BobYardMakret<T>,
         offer_id: ID,
         ctx: &mut TxContext
     ) {
-        let Offers {
+        let Offer {
             id,
             list_id,
             expire_time: _,
             owner,
-        } = ofield::remove(&mut marketplace.offer_id, offer_id);
+        } = dyn::remove(&mut marketplace.offer_id, offer_id);
         assert!(tx_context::sender(ctx) == owner, ENotOwner);
 
-        let item: T = ofield::remove(&mut id, true);
-        transfer::transfer(item, owner);
+        let item: ITEM = dyn::remove(&mut id, true);
+        public_transfer(item, owner);
+
         object::delete(id);
-        //emit event
-        EmitCancelOfferEvent<T, MKTYPE>(offer_id, list_id, owner)
+
+        // emit event
+        // EmitCancelOfferEvent<T, MKTYPE>(offer_id, list_id, owner)
+    }
+
+    fun buy<T,ITEM: key + store>(
+        marketplace: &mut BobYardMakret<T>,
+        item_id: ID,
+        paid: Coin<T>,
+        ctx: &mut TxContext
+    ): (ITEM, Coin<T>) {
+        let Listing {
+            id,
+            ask,
+            owner
+        } = dyn::remove(&mut marketplace.id, item_id);
+        assert!(ask < coin::value(&paid), EAmountIncorrect);
+        let buyer = tx_context::sender(ctx);
+        assert!(buyer != owner, EBuyerCanBeSeller);
+
+        let item: ITEM = dyn::remove(&mut id, true);
+        object::delete(id);
+
+        if (ask == coin::value(&paid)) {
+            public_transfer(paid, owner);
+            return (item, coin::zero<T>(ctx))
+        } else {
+            let take = coin::split(&mut paid, ask, ctx);
+            public_transfer(take, owner);
+            return (item, paid)
+        }
     }
 }
