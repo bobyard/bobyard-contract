@@ -1,151 +1,120 @@
 module bob::events {
-    use std::type_name;
     use sui::event::emit;
-    use sui::object::{Self, ID, UID};
+    use sui::object::ID;
 
     friend bob::bobYard;
 
-    struct MarketCreateEvent has copy, drop {
-        id: ID,
-        offer_id: ID,
-    }
-
-    struct ListEvent has copy, drop {
+    struct ListEvent<phantom T> has copy, drop {
         list_id: ID,
-        list_type: type_name::TypeName,
-        coin_type: type_name::TypeName,
+        list_item_id: ID,
+        expire_time: u64,
         ask: u64,
         owner: address,
     }
 
-    struct DeListEvent has copy, drop {
+    struct DeListEvent<phantom T> has copy, drop {
         list_id: ID,
-        list_type: type_name::TypeName,
-        coin_type: type_name::TypeName,
+        list_item_id: ID,
+        expire_time: u64,
         ask: u64,
         owner: address,
     }
 
-    struct BuyEvent has copy, drop {
+    struct BuyEvent<phantom T> has copy, drop {
         list_id: ID,
         ask: u64,
-        list_type: type_name::TypeName,
-        coin_type: type_name::TypeName,
         owner: address,
         buyer: address,
     }
 
-    struct AcceptOfferEvent has copy, drop {
+    struct AcceptOfferEvent<phantom T> has copy, drop {
         offer_id: ID,
         list_id: ID,
-        list_type: type_name::TypeName,
-        coin_type: type_name::TypeName,
-        offer_type: type_name::TypeName,
         offer_amount: u64,
         owner: address,
         buyer: address,
     }
 
-    struct OfferEvent has copy, drop {
+    struct OfferEvent<phantom T> has copy, drop {
         offer_id: ID,
         list_id: ID,
-        offer_type: type_name::TypeName,
-        coin_type: type_name::TypeName,
         offer_amount: u64,
         expire_time: u64,
         owner: address,
     }
 
-    struct CancelOfferEvent has copy, drop {
+    struct CancelOfferEvent<phantom T> has copy, drop {
         offer_id: ID,
         list_id: ID,
-        offer_type: type_name::TypeName,
-        coin_type: type_name::TypeName,
         owner: address,
     }
 
-    public(friend) fun EmitCreateMarketEvent(id: &UID, offer_id: &UID) {
-        emit(MarketCreateEvent {
-            id: object::uid_to_inner(id),
-            offer_id: object::uid_to_inner(offer_id),
-        });
-    }
 
-
-    public(friend) fun EmitListEvent<T: key + store, MKTYPE>(list_id: ID, ask: u64, owner: address) {
-        emit(ListEvent {
+    public(friend) fun EmitListEvent<T>(list_id: ID, list_item_id: ID, ask: u64, expire_time: u64, owner: address) {
+        emit(ListEvent<T> {
             list_id,
-            list_type: type_name::get<T>(),
-            coin_type: type_name::get<MKTYPE>(),
+            list_item_id,
+            expire_time,
             ask,
             owner,
         })
     }
 
-    public(friend) fun EmitDeListEvent<T: key + store, MKTYPE>(list_id: ID, ask: u64, owner: address) {
-        emit(DeListEvent {
+    public(friend) fun EmitDeListEvent<T>(list_id: ID, list_item_id: ID, ask: u64, expire_time: u64, owner: address) {
+        emit(DeListEvent<T> {
             list_id,
-            list_type: type_name::get<T>(),
-            coin_type: type_name::get<MKTYPE>(),
+            list_item_id,
+            expire_time,
             ask,
             owner,
         })
     }
 
-    public(friend) fun EmitBuyEvent<T: key + store, MKTYPE>(list_id: ID, ask: u64, owner: address, buyer: address) {
-        emit(BuyEvent {
+    public(friend) fun EmitBuyEvent<T>(list_id: ID, ask: u64, owner: address, buyer: address) {
+        emit(BuyEvent<T> {
             list_id,
-            list_type: type_name::get<T>(),
-            coin_type: type_name::get<MKTYPE>(),
             ask,
             owner,
             buyer,
         });
     }
 
-    public(friend) fun EmitAcceptOfferEvent<BuyItem: key+store, SellItem: key+store, MKTYPE>(
+    public(friend) fun EmitAcceptOfferEvent<T>(
         offer_id: ID,
         list_id: ID,
         owner: address,
         buyer: address,
         offer_amount: u64
     ) {
-        emit(AcceptOfferEvent {
+        emit(AcceptOfferEvent<T> {
             offer_id,
             list_id,
-            list_type: type_name::get<BuyItem>(),
-            coin_type: type_name::get<MKTYPE>(),
-            offer_type: type_name::get<SellItem>(),
-            offer_amount: 0,
+            offer_amount,
             owner,
             buyer,
         });
     }
 
-    public(friend) fun EmitOfferEvent<T: key + store, MKTYPE>(
+    public(friend) fun EmitOfferEvent<T>(
         offer_id: ID,
         list_id: ID,
         offer_amount: u64,
         expire_time: u64,
         owner: address
     ) {
-        emit(OfferEvent {
+        emit(OfferEvent<T> {
             offer_id,
             list_id,
-            offer_type: type_name::get<T>(),
-            coin_type: type_name::get<MKTYPE>(),
             offer_amount,
             expire_time,
             owner
         })
     }
 
-    public(friend) fun EmitCancelOfferEvent<T: key + store, MKTYPE>(offer_id: ID, list_id: ID, owner: address) {
-        emit(CancelOfferEvent {
+    public(friend) fun EmitCancelOfferEvent<T>(offer_id: ID, list_id: ID, owner: address) {
+        emit(CancelOfferEvent<T> {
             offer_id,
             list_id,
-            offer_type: type_name::get<T>(),
-            coin_type: type_name::get<MKTYPE>(),
             owner,
         });
     }

@@ -19,12 +19,10 @@ sui client call --package $PKG --module bobYard --function create --type-args  0
 sui client call --package $PKG --module bobYard --function list --type-args 0x2::sui::SUI 0xbbc4945f4d02d05df8aecad3937a04e7434687017f008efcb4ff0c2f3a2a8f31::Ninjas::NinJasNFT  --args $MK 0xf1bf514ea68add21bf4042638430996cf26cc70a81f2ca607ed3fea6fa0c9d88 100000000 --gas-budget 30000000
 ```
 
-## Cancel Object
+## Delist Object
 ```shell
-sui client call --package $PKG --module bobYard --function list --type-args 0x2::sui::SUI 0xbbc4945f4d02d05df8aecad3937a04e7434687017f008efcb4ff0c2f3a2a8f31::Ninjas::NinJasNFT  --args $MK 0xf1bf514ea68add21bf4042638430996cf26cc70a81f2ca607ed3fea6fa0c9d88 100000000 --gas-budget 30000000
+sui client call --package $PKG --module bobYard --function delist --type-args 0x2::sui::SUI 0xbbc4945f4d02d05df8aecad3937a04e7434687017f008efcb4ff0c2f3a2a8f31::Ninjas::NinJasNFT  --args $MK 0x21fe31f29516c4d382d67d297876ae306a8b03e9a03d5ad58ac34d5e6450a92d --gas-budget 30000000
 ```
-
-
 
 ## Buy Object
 ```shell
