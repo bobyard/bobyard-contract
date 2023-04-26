@@ -13,7 +13,6 @@ ADMIN=0x694c746553721bb3af146d12fa8a32a297fded916382e26b809f7800e79588e7
 sui client call --package $PKG --module bobYard --function create --type-args  0x2::sui::SUI --args $ADMIN --gas-budget 300000000
 ```
 
-
 ## List Object
 ```shell
 sui client call --package $PKG --module bobYard --function list --type-args 0x2::sui::SUI 0xbbc4945f4d02d05df8aecad3937a04e7434687017f008efcb4ff0c2f3a2a8f31::Ninjas::NinJasNFT  --args $MK 0xf1bf514ea68add21bf4042638430996cf26cc70a81f2ca607ed3fea6fa0c9d88 100000000 --gas-budget 30000000
