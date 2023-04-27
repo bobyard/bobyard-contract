@@ -139,11 +139,12 @@ module bob::bobYard {
 
         // for seller
         let list_item: BuyItem = dyn::remove(&mut list_uid, true);
+        let item_id = object::id(&list_item);
         object::delete(list_uid);
         public_transfer(list_item, buyer);
 
         // emit event
-        EmitAcceptOfferEvent<T>(offer_id, list_id, owner, buyer, offer_amount)
+        EmitAcceptOfferEvent<T>(offer_id, list_id,item_id, owner, buyer, offer_amount)
     }
 
     public entry fun make_offer<T>(
@@ -207,10 +208,10 @@ module bob::bobYard {
         assert!(buyer != owner, EBuyerCanBeSeller);
 
         let item: ITEM = dyn::remove(&mut id, true);
+        let item_id = object::id(&item);
         object::delete(id);
 
-        EmitBuyEvent<T>(list_id, ask, owner, buyer);
-
+        EmitBuyEvent<T>(list_id,item_id ,ask, owner, buyer);
         public_transfer(paid, owner);
         item
     }
