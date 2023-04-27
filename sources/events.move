@@ -22,6 +22,7 @@ module bob::events {
 
     struct BuyEvent<phantom T> has copy, drop {
         list_id: ID,
+        item_id: ID,
         ask: u64,
         owner: address,
         buyer: address,
@@ -30,6 +31,7 @@ module bob::events {
     struct AcceptOfferEvent<phantom T> has copy, drop {
         offer_id: ID,
         list_id: ID,
+        item_id: ID,
         offer_amount: u64,
         owner: address,
         buyer: address,
@@ -70,9 +72,10 @@ module bob::events {
         })
     }
 
-    public(friend) fun EmitBuyEvent<T>(list_id: ID, ask: u64, owner: address, buyer: address) {
+    public(friend) fun EmitBuyEvent<T>(list_id: ID, item_id:ID,ask: u64, owner: address, buyer: address) {
         emit(BuyEvent<T> {
             list_id,
+            item_id,
             ask,
             owner,
             buyer,
@@ -82,6 +85,7 @@ module bob::events {
     public(friend) fun EmitAcceptOfferEvent<T>(
         offer_id: ID,
         list_id: ID,
+        item_id: ID,
         owner: address,
         buyer: address,
         offer_amount: u64
@@ -89,6 +93,7 @@ module bob::events {
         emit(AcceptOfferEvent<T> {
             offer_id,
             list_id,
+            item_id,
             offer_amount,
             owner,
             buyer,
