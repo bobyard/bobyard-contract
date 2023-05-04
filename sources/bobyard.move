@@ -1,5 +1,5 @@
 module bob::bobYard {
-    use bob::events::EmitBuyEvent;
+    use bob::events::{EmitBuyEvent, EmitListEvent};
     use sui::clock::{Clock, timestamp_ms};
     use sui::coin::{Coin, Self};
     use sui::dynamic_object_field as dyn;
@@ -96,6 +96,23 @@ module bob::bobYard {
         EmitBuyEvent<T>(list_id, item_id, ask, owner, buyer);
         public_transfer(paid, owner);
         item
+    }
+
+    public(friend) fun change_listing_price_or_time<T,ITEM:key+store>(
+        marketplace: &mut Market<T>,
+        list_id: ID,
+        ask: u64,
+        expire_time: u64,
+        ctx: &mut TxContext
+    ) {
+        let listing  = dyn::borrow_mut<ID,Listing>(&mut marketplace.id, list_id);
+        assert!(tx_context::sender(ctx) == listing.owner, ENotOwner);
+
+        listing.ask = ask;
+        listing.expire_time = expire_time;
+        let item_id = object::id(listing);
+
+        EmitListEvent<T>(list_id, item_id, ask, expire_time, listing.owner);
     }
 
     public(friend) fun init_list(

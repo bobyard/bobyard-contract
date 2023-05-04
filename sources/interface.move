@@ -1,5 +1,5 @@
 module bob::interface {
-    use bob::bobYard::{Self, Market, rem_listing_from_market, init_offer, add_offer_to_market, rem_offer_from_market, add_item_to_list, add_listing_to_market, init_list, Listing, is_last};
+    use bob::bobYard::{Self, Market, rem_listing_from_market, init_offer, add_offer_to_market, rem_offer_from_market, add_item_to_list, add_listing_to_market, init_list, Listing, is_last, change_listing_price_or_time};
     use bob::events::{EmitDeListEvent, EmitListEvent, EmitOfferEvent, EmitCancelOfferEvent, EmitAcceptOfferEvent};
     use sui::clock::{Clock, timestamp_ms};
     use sui::coin::{Self, Coin};
@@ -37,32 +37,19 @@ module bob::interface {
         add_item_to_list<T, bool, ITEM>(&mut listing, true, item);
         add_listing_to_market<T, ID, Listing>(marketplace, list_id, listing);
 
-
         EmitListEvent<T>(list_id, item_id, ask, expire_time, owner)
     }
 
-    // public entry fun change_listing<T, ITEM: key + store>(
-    //     marketplace: &mut Market<T>,
-    //     list_id: ID,
-    //     ask: u64,
-    //     expire_time: u64,
-    //     ctx: &mut TxContext
-    // ) {
-    //     let (
-    //         id,
-    //         _,
-    //         _,
-    //         owner,
-    //     ) = borrow_mut_listing_from_market<T, ID>(marketplace, list_id);
-    //     assert!(tx_context::sender(ctx) == owner, ENotOwner);
-    //
-    //     let item: ITEM = dyn::remove<bool, ITEM>(&mut id, true);
-    //     let item_id = object::id(&item);
-    //
-    //     first_list<T, ITEM>(marketplace, item, id, ask, expire_time, owner);
-    //
-    //     EmitListEvent<T>(list_id, item_id, ask, expire_time, owner)
-    // }
+    public entry fun change_listing<T, ITEM: key + store>(
+        marketplace: &mut Market<T>,
+        list_id: ID,
+        ask: u64,
+        expire_time: u64,
+        ctx: &mut TxContext
+    ) {
+        assert!(is_last(marketplace), ENotLastVersion);
+        change_listing_price_or_time<T, ITEM>(marketplace, list_id, ask, expire_time, ctx);
+    }
 
     public entry fun delist<T, ITEM: key + store>(
         marketplace: &mut Market<T>,
