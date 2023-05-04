@@ -7,6 +7,8 @@ module bob::interface {
     use sui::object::{Self, ID};
     use sui::transfer;
     use sui::tx_context::{Self, TxContext};
+    use std::vector;
+
 
     const EAmountIncorrect: u64 = 0;
     const ENotOwner: u64 = 1;
@@ -86,6 +88,37 @@ module bob::interface {
             sender
         );
     }
+
+    fun destroy_or_sender<T>(coin: Coin<T>, ctx: &mut TxContext) {
+        let val = coin::value(&coin);
+        if (val == 0) {
+            coin::destroy_zero(coin);
+        }else {
+            transfer::public_transfer(coin, tx_context::sender(ctx));
+        }
+    }
+
+    public entry fun sweep<T, ITEM: key+store>(
+        marketplace: &mut Market<T>,
+        item_ids: vector<ID>,
+        paid: Coin<T>,
+        clock: &Clock,
+        ctx: &mut TxContext
+    ) {
+        assert!(is_last(marketplace), ENotLastVersion);
+
+        let length = vector::length(&item_ids);
+        let i: u64 = 0;
+        while (i < length) {
+            let item_id = vector::pop_back(&mut item_ids);
+            bobYard::sweep<T, ITEM>(marketplace, item_id, &mut paid, clock, ctx);
+
+            i = i + 1;
+        };
+
+        destroy_or_sender(paid, ctx);
+    }
+
 
     public entry fun make_offer<T>(
         marketplace: &mut Market<T>,

@@ -76,7 +76,6 @@ module bob::bobYard {
         clock: &Clock,
         ctx: &mut TxContext
     ): ITEM {
-
         let Listing {
             id,
             ask,
@@ -97,6 +96,37 @@ module bob::bobYard {
         public_transfer(paid, owner);
         item
     }
+
+    public(friend) fun sweep<T, ITEM: key + store>(
+        marketplace: &mut Market<T>,
+        list_id: ID,
+        paid: &mut Coin<T>,
+        clock: &Clock,
+        ctx: &mut TxContext
+    ) {
+        let Listing {
+            id,
+            ask,
+            expire_time,
+            owner
+        } = dyn::remove(&mut marketplace.id, list_id);
+        assert!(ask <= coin::value(paid), EAmountIncorrect);
+        assert!(timestamp_ms(clock) <= expire_time, EExpired);
+
+        let buyer = tx_context::sender(ctx);
+        assert!(buyer != owner, EBuyerCanBeSeller);
+
+        let item: ITEM = dyn::remove(&mut id, true);
+        let item_id = object::id(&item);
+        object::delete(id);
+
+        EmitBuyEvent<T>(list_id, item_id, ask, owner, buyer);
+        let to_seller = coin::split(paid, ask,ctx);
+        public_transfer(to_seller, owner);
+        public_transfer(item, owner);
+        EmitBuyEvent<T>(list_id, item_id, ask, owner, buyer);
+    }
+
 
     public(friend) fun change_listing_price_or_time<T,ITEM:key+store>(
         marketplace: &mut Market<T>,
