@@ -3,6 +3,8 @@ module bob::events {
     use sui::object::ID;
 
     friend bob::bobYard;
+    friend bob::interface;
+
 
     struct ListEvent<phantom T> has copy, drop {
         list_id: ID,
@@ -72,7 +74,7 @@ module bob::events {
         })
     }
 
-    public(friend) fun EmitBuyEvent<T>(list_id: ID, item_id:ID,ask: u64, owner: address, buyer: address) {
+    public(friend) fun EmitBuyEvent<T>(list_id: ID, item_id: ID, ask: u64, owner: address, buyer: address) {
         emit(BuyEvent<T> {
             list_id,
             item_id,
