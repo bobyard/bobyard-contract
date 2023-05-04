@@ -15,12 +15,17 @@ module bob::bobYard {
     const EEmptyObjects: u64 = 2;
     const EBuyerCanBeSeller: u64 = 3;
     const EExpired: u64 = 4;
+    const ENotLastVersion: u64 = 5;
+
+
+    const VERSION:u64=0;
 
 
     struct Market<phantom T> has key {
         id: UID,
         offer_id: UID,
-        owner: address
+        owner: address,
+        version:u64,
     }
 
     struct Listing has key, store {
@@ -42,7 +47,11 @@ module bob::bobYard {
         let id = object::new(ctx);
         let offer_id = object::new(ctx);
 
-        transfer::share_object(Market<T> { id, offer_id, owner: tx_context::sender(ctx) })
+        transfer::share_object(Market<T> { id, offer_id, owner: tx_context::sender(ctx),version:VERSION })
+    }
+
+    public(friend) fun is_last<T>(mk:&mut Market<T>):bool{
+        mk.version == VERSION
     }
 
     public(friend) fun first_list<T, ITEM: key+store>(
@@ -67,6 +76,7 @@ module bob::bobYard {
         clock: &Clock,
         ctx: &mut TxContext
     ): ITEM {
+
         let Listing {
             id,
             ask,

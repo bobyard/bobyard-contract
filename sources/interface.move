@@ -1,5 +1,5 @@
 module bob::interface {
-    use bob::bobYard::{Self, Market, rem_listing_from_market, init_offer, add_offer_to_market, rem_offer_from_market, add_item_to_list, add_listing_to_market, init_list, Listing};
+    use bob::bobYard::{Self, Market, rem_listing_from_market, init_offer, add_offer_to_market, rem_offer_from_market, add_item_to_list, add_listing_to_market, init_list, Listing, is_last};
     use bob::events::{EmitDeListEvent, EmitListEvent, EmitOfferEvent, EmitCancelOfferEvent, EmitAcceptOfferEvent};
     use sui::clock::{Clock, timestamp_ms};
     use sui::coin::{Self, Coin};
@@ -13,6 +13,8 @@ module bob::interface {
     const EEmptyObjects: u64 = 2;
     const EBuyerCanBeSeller: u64 = 3;
     const EExpired: u64 = 4;
+    const ENotLastVersion: u64 = 5;
+
 
     public entry fun list<T, ITEM: key + store>(
         marketplace: &mut Market<T>,
@@ -22,6 +24,7 @@ module bob::interface {
         clock: &Clock,
         ctx: &mut TxContext
     ) {
+        assert!(is_last(marketplace), ENotLastVersion);
         assert!(ask > 0, EAmountIncorrect);
         assert!(expire_time > timestamp_ms(clock), EExpired);
 
@@ -66,6 +69,7 @@ module bob::interface {
         list_id: ID,
         ctx: &mut TxContext
     ) {
+        assert!(is_last(marketplace), ENotLastVersion);
         let (
             id,
             ask,
@@ -88,6 +92,7 @@ module bob::interface {
         clock: &Clock,
         ctx: &mut TxContext
     ) {
+        assert!(is_last(marketplace), ENotLastVersion);
         let sender = tx_context::sender(ctx);
         transfer::public_transfer(
             bobYard::buy_one<T, ITEM>(marketplace, item_id, paid, clock, ctx),
@@ -102,6 +107,7 @@ module bob::interface {
         expire_time: u64,
         ctx: &mut TxContext)
     {
+        assert!(is_last(marketplace), ENotLastVersion);
         let amount = coin::value(&paid);
 
         let offer = init_offer(list_id, paid, expire_time, tx_context::sender(ctx), ctx);
@@ -116,6 +122,8 @@ module bob::interface {
         offer_id: ID,
         ctx: &mut TxContext
     ) {
+        assert!(is_last(marketplace), ENotLastVersion);
+
         let (
             id,
             list_id,
@@ -137,6 +145,8 @@ module bob::interface {
         clock: &Clock,
         ctx: &mut TxContext
     ) {
+        assert!(is_last(marketplace), ENotLastVersion);
+
         let sender = tx_context::sender(ctx);
         let (
             list_uid,
