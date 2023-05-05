@@ -1,19 +1,29 @@
-module bob::admin {
+module bob::manage {
     use sui::object::{Self, UID};
     use sui::transfer;
     use sui::tx_context::{Self, TxContext};
+    use bob::bobYard::Market;
+    use bob::bobYard;
 
     const E_NOT_MANAGE_OR_ADMIN: u64 = 0;
 
     struct Cap has key {
-        id: UID
+        id: UID,
     }
 
     fun init(ctx: &mut TxContext) {
         let manage = Cap {
-            id: object::new(ctx)
+            id: object::new(ctx),
         };
 
         transfer::transfer(manage, tx_context::sender(ctx));
+    }
+
+    public entry fun change_market_fee<T>(market:&mut Market<T>,_cap:&Cap,fee:u64) {
+        bobYard::change_market_fee(market, fee);
+    }
+
+    public entry fun take_fee<T>(market:&mut Market<T>,_cap:&Cap,ctx:&mut TxContext){
+        bobYard::take_market_fee_coin(market, ctx);
     }
 }

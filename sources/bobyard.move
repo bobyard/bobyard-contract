@@ -8,7 +8,7 @@ module bob::bobYard {
     use sui::tx_context::{Self, TxContext};
 
     friend bob::interface;
-    friend bob::admin;
+    friend bob::manage;
 
     const EAmountIncorrect: u64 = 0;
     const ENotOwner: u64 = 1;
@@ -17,15 +17,15 @@ module bob::bobYard {
     const EExpired: u64 = 4;
     const ENotLastVersion: u64 = 5;
 
-
-    const VERSION:u64=0;
-
+    const VERSION: u64 = 0;
+    const TX_FEE_DECIMAL: u64 = 10000;
 
     struct Market<phantom T> has key {
         id: UID,
         offer_id: UID,
-        owner: address,
-        version:u64,
+        fee: u64,
+        fee_coin: Coin<T>,
+        version: u64,
     }
 
     struct Listing has key, store {
@@ -46,13 +46,19 @@ module bob::bobYard {
     public(friend) fun init_market<T>(ctx: &mut TxContext) {
         let id = object::new(ctx);
         let offer_id = object::new(ctx);
-
-        transfer::share_object(Market<T> { id, offer_id, owner: tx_context::sender(ctx),version:VERSION })
+        transfer::share_object(
+            Market<T> {
+                id, offer_id, fee: 50, fee_coin: coin::zero<T>(
+                    ctx
+                ), version: VERSION
+            }
+        )
     }
 
-    public(friend) fun is_last<T>(mk:&mut Market<T>):bool{
+    public(friend) fun is_last<T>(mk: &mut Market<T>): bool {
         mk.version == VERSION
     }
+
 
     public(friend) fun first_list<T, ITEM: key+store>(
         marketplace: &mut Market<T>,
@@ -121,21 +127,21 @@ module bob::bobYard {
         object::delete(id);
 
         EmitBuyEvent<T>(list_id, item_id, ask, owner, buyer);
-        let to_seller = coin::split(paid, ask,ctx);
+        let to_seller = coin::split(paid, ask, ctx);
         public_transfer(to_seller, owner);
         public_transfer(item, owner);
         EmitBuyEvent<T>(list_id, item_id, ask, owner, buyer);
     }
 
 
-    public(friend) fun change_listing_price_or_time<T,ITEM:key+store>(
+    public(friend) fun change_listing_price_or_time<T, ITEM: key+store>(
         marketplace: &mut Market<T>,
         list_id: ID,
         ask: u64,
         expire_time: u64,
         ctx: &mut TxContext
     ) {
-        let listing  = dyn::borrow_mut<ID,Listing>(&mut marketplace.id, list_id);
+        let listing = dyn::borrow_mut<ID, Listing>(&mut marketplace.id, list_id);
         assert!(tx_context::sender(ctx) == listing.owner, ENotOwner);
 
         listing.ask = ask;
@@ -231,4 +237,22 @@ module bob::bobYard {
         } = dyn::remove<ID, Offer<T>>(&mut market.offer_id, offer_id);
         (id, list_id, paid, expire_time, owner)
     }
+
+
+    public(friend) fun change_market_fee<T>(
+        market: &mut Market<T>,
+        fee: u64
+    ) {
+        market.fee = fee;
+    }
+
+    public(friend) fun take_market_fee_coin<T>(
+        market: &mut Market<T>,
+        ctx: &mut TxContext
+    ) {
+        let fee = coin::value(&market.fee_coin);
+        let take = coin::split(&mut market.fee_coin, fee, ctx);
+        public_transfer(take, tx_context::sender(ctx));
+    }
+
 }
