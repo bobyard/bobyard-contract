@@ -19,6 +19,9 @@ module bob::core {
 
     friend bob::interface;
 
+    #[test_only]
+    friend bob::core_tests;
+
     public(friend) fun list<T, ITEM: key + store>(
         marketplace: &mut Market<T>,
         item: ITEM,
