@@ -9,6 +9,10 @@ module bob::bobYard {
 
     friend bob::interface;
     friend bob::manage;
+    friend bob::core;
+
+    #[test_only]
+    friend bob::bobyard_tests;
 
     const EAmountIncorrect: u64 = 0;
     const ENotOwner: u64 = 1;
@@ -59,22 +63,6 @@ module bob::bobYard {
         mk.version == VERSION
     }
 
-
-    public(friend) fun first_list<T, ITEM: key+store>(
-        marketplace: &mut Market<T>,
-        item: ITEM,
-        ask: u64,
-        expire_time: u64,
-        owner: address,
-        ctx: &mut TxContext
-    ) {
-        let listing = init_list(ask, expire_time, owner, ctx);
-        let list_id = object::id(&listing);
-
-        add_item_to_list<T, bool, ITEM>(&mut listing, true, item);
-        add_listing_to_market<T, ID, Listing>(marketplace, list_id, listing);
-    }
-
     public(friend) fun buy_one<T, ITEM: key + store>(
         marketplace: &mut Market<T>,
         list_id: ID,
@@ -99,6 +87,7 @@ module bob::bobYard {
         object::delete(id);
 
         EmitBuyEvent<T>(list_id, item_id, ask, owner, buyer);
+        take_market_fee(marketplace, &mut paid, ctx);
         public_transfer(paid, owner);
         item
     }
@@ -128,13 +117,15 @@ module bob::bobYard {
 
         EmitBuyEvent<T>(list_id, item_id, ask, owner, buyer);
         let to_seller = coin::split(paid, ask, ctx);
+
+        take_market_fee(marketplace, &mut to_seller, ctx);
+
         public_transfer(to_seller, owner);
         public_transfer(item, owner);
         EmitBuyEvent<T>(list_id, item_id, ask, owner, buyer);
     }
 
-
-    public(friend) fun change_listing_price_or_time<T, ITEM: key+store>(
+    public(friend) fun change_listing_price_and_time<T, ITEM: key+store>(
         marketplace: &mut Market<T>,
         list_id: ID,
         ask: u64,
@@ -238,7 +229,6 @@ module bob::bobYard {
         (id, list_id, paid, expire_time, owner)
     }
 
-
     public(friend) fun change_market_fee<T>(
         market: &mut Market<T>,
         fee: u64
@@ -255,4 +245,74 @@ module bob::bobYard {
         public_transfer(take, tx_context::sender(ctx));
     }
 
+    public(friend) fun take_market_fee<T>(
+        market: &mut Market<T>,
+        paid: &mut Coin<T>,
+        ctx: &mut TxContext
+    ) {
+        let paid_val = coin::value(paid);
+        let fee = market.fee * paid_val / TX_FEE_DECIMAL;
+        let take = coin::split(paid, fee, ctx);
+        coin::join(&mut market.fee_coin, take);
+    }
+
+    #[test]
+    fun test_take_market_fee() {
+        use sui::sui::SUI;
+        use sui::test_scenario::{Self, next_tx};
+        use sui::test_utils;
+
+        let ctx = tx_context::dummy();
+        let sender = tx_context::sender(&mut ctx);
+        let scenario = test_scenario::begin(sender);
+        // let clock = clock::create_for_testing(&mut ctx);
+        init_market<SUI>(&mut ctx);
+        next_tx(&mut scenario, sender);
+        let market = test_scenario::take_shared<Market<SUI>>(&mut scenario);
+        let coin = coin::mint_for_testing<SUI>(100, &mut ctx);
+        take_market_fee(&mut market, &mut coin, &mut ctx);
+        assert!(coin::value(&coin) == 100, 1);
+        assert!(coin::value(&market.fee_coin) == 0, 2);
+        test_utils::destroy(coin);
+
+        let coin = coin::mint_for_testing<SUI>(1000, &mut ctx);
+        take_market_fee(&mut market, &mut coin, &mut ctx);
+        assert!(coin::value(&coin) == 995, 3);
+        assert!(coin::value(&market.fee_coin) == 5, 4);
+
+        test_utils::destroy(coin);
+
+        test_scenario::return_shared(market);
+        test_scenario::end(scenario);
+    }
+
+    #[test]
+    fun test_take_market_fee_coin() {
+        use sui::sui::SUI;
+        use sui::test_scenario::{Self, next_tx};
+        use sui::test_utils;
+
+        let ctx = tx_context::dummy();
+        let sender = tx_context::sender(&mut ctx);
+        let scenario = test_scenario::begin(sender);
+        // let clock = clock::create_for_testing(&mut ctx);
+        init_market<SUI>(&mut ctx);
+        next_tx(&mut scenario, sender);
+        let market = test_scenario::take_shared<Market<SUI>>(&mut scenario);
+        let coin = coin::mint_for_testing<SUI>(1000, &mut ctx);
+        take_market_fee(&mut market, &mut coin, &mut ctx);
+        assert!(coin::value(&coin) == 995, 3);
+        assert!(coin::value(&market.fee_coin) == 5, 4);
+        test_utils::destroy(coin);
+
+        take_market_fee_coin(&mut market, &mut ctx);
+        next_tx(&mut scenario, sender);
+        let coin = test_scenario::take_from_sender<Coin<SUI>>(&mut scenario);
+        assert!(coin::value(&coin) == 5, 5);
+        assert!(coin::value(&market.fee_coin) == 0, 6);
+        test_utils::destroy(coin);
+
+        test_scenario::return_shared(market);
+        test_scenario::end(scenario);
+    }
 }

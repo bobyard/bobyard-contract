@@ -4,6 +4,7 @@ module bob::events {
 
     friend bob::bobYard;
     friend bob::interface;
+    friend bob::core;
 
 
     struct ListEvent<phantom T> has copy, drop {
