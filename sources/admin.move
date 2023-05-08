@@ -2,8 +2,8 @@ module bob::manage {
     use sui::object::{Self, UID};
     use sui::transfer;
     use sui::tx_context::{Self, TxContext};
-    use bob::bobYard::Market;
-    use bob::bobYard;
+    use bob::core::Market;
+    use bob::core;
 
     const E_NOT_MANAGE_OR_ADMIN: u64 = 0;
 
@@ -20,10 +20,10 @@ module bob::manage {
     }
 
     public entry fun change_market_fee<T>(market:&mut Market<T>,_cap:&Cap,fee:u64) {
-        bobYard::change_market_fee(market, fee);
+        core::change_market_fee(market, fee);
     }
 
     public entry fun take_fee<T>(market:&mut Market<T>,_cap:&Cap,ctx:&mut TxContext){
-        bobYard::take_market_fee_coin(market, ctx);
+        core::take_market_fee_coin(market, ctx);
     }
 }

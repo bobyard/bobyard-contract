@@ -3,7 +3,6 @@ module bob::events {
     use sui::object::ID;
 
     friend bob::bobYard;
-    friend bob::interface;
     friend bob::core;
 
 
