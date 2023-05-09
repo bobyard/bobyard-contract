@@ -2,7 +2,7 @@ module bob::events {
     use sui::event::emit;
     use sui::object::ID;
 
-    friend bob::bobYard;
+    friend bob::internal;
     friend bob::core;
 
 

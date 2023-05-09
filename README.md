@@ -10,7 +10,7 @@ ADMIN=0x694c746553721bb3af146d12fa8a32a297fded916382e26b809f7800e79588e7
 
 ## Init Market with Coin type
 ```shell
-sui client call --package $PKG --module bobYard --function create --type-args  0x2::sui::SUI --args $ADMIN --gas-budget 300000000
+sui client call --package $PKG --module admin --function init_market --type-args  0x2::sui::SUI --args 0x3d52de33f5a9864f7df5bced3a5aacc326a1aa4e5203b12ba1e62cecc5a2373a --gas-budget 300000000
 ```
 
 ## List Object

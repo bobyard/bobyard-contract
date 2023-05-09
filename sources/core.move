@@ -9,7 +9,7 @@ module bob::core {
 
 
     friend bob::manage;
-    friend bob::bobYard;
+    friend bob::internal;
 
     #[test_only]
     friend bob::core_tests;

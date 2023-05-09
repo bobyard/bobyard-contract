@@ -1,9 +1,9 @@
 module bob::bobYard {
 
     use bob::core::Market;
+    use bob::internal;
     use sui::clock::Clock;
     use sui::tx_context::TxContext;
-    use bob::bobYard;
     use sui::object::ID;
     use sui::coin::Coin;
 
@@ -15,7 +15,7 @@ module bob::bobYard {
         clock: &Clock,
         ctx: &mut TxContext
     ) {
-        bobYard::list<T, ITEM>(marketplace, item, ask, expire_time, clock, ctx);
+        internal::list<T, ITEM>(marketplace, item, ask, expire_time, clock, ctx);
     }
 
     public entry fun change_listing<T, ITEM: key + store>(
@@ -25,7 +25,7 @@ module bob::bobYard {
         expire_time: u64,
         ctx: &mut TxContext
     ) {
-        bobYard::change_listing<T, ITEM>(marketplace, list_id, ask, expire_time, ctx);
+        internal::change_listing<T, ITEM>(marketplace, list_id, ask, expire_time, ctx);
     }
 
     public entry fun delist<T, ITEM: key + store>(
@@ -33,7 +33,7 @@ module bob::bobYard {
         list_id: ID,
         ctx: &mut TxContext
     ) {
-        bobYard::delist<T, ITEM>(marketplace, list_id, ctx);
+        internal::delist<T, ITEM>(marketplace, list_id, ctx);
     }
 
     public entry fun buy_one<T, ITEM: key + store>(
@@ -43,7 +43,7 @@ module bob::bobYard {
         clock: &Clock,
         ctx: &mut TxContext
     ) {
-        bobYard::buy<T, ITEM>(marketplace, item_id, paid, clock, ctx);
+        internal::buy<T, ITEM>(marketplace, item_id, paid, clock, ctx);
     }
 
     public entry fun sweep<T, ITEM: key+store>(
@@ -53,7 +53,7 @@ module bob::bobYard {
         clock: &Clock,
         ctx: &mut TxContext
     ) {
-        bobYard::sweep<T, ITEM>(marketplace, item_ids, paid, clock, ctx);
+        internal::sweep<T, ITEM>(marketplace, item_ids, paid, clock, ctx);
     }
 
 
@@ -64,7 +64,7 @@ module bob::bobYard {
         expire_time: u64,
         ctx: &mut TxContext)
     {
-        bobYard::make_offer(marketplace, list_id, paid, expire_time, ctx);
+        internal::make_offer(marketplace, list_id, paid, expire_time, ctx);
     }
 
     public entry fun cancel_offer<T>(
@@ -82,6 +82,6 @@ module bob::bobYard {
         clock: &Clock,
         ctx: &mut TxContext
     ) {
-        bobYard::accept_offer<T, BuyItem>(marketplace, list_id, offer_id, clock, ctx);
+        internal::accept_offer<T, BuyItem>(marketplace, list_id, offer_id, clock, ctx);
     }
 }

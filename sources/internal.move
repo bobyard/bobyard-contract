@@ -1,4 +1,4 @@
-module bob::bobYard {
+module bob::internal {
     use std::vector;
 
     use bob::core::{Self, Market, rem_listing_from_market, init_offer, add_offer_to_market, rem_offer_from_market, add_item_to_list, add_listing_to_market, init_list, Listing, change_listing_price_and_time, take_market_fee, is_last};

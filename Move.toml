@@ -1,6 +1,7 @@
 [package]
 name = "BobYard"
 version = "0.0.2"
+published-at = "0x90771df02714f8bf3fe68eaacf9811ca9975f8afd10efe3ecfbce489a9e56885"
 
 [dependencies]
 Sui = { git = "https://github.com/MystenLabs/sui.git", subdir = "crates/sui-framework/packages/sui-framework", rev = "testnet" }

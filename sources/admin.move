@@ -1,4 +1,4 @@
-module bob::manage {
+module bob::admin {
     use sui::object::{Self, UID};
     use sui::transfer;
     use sui::tx_context::{Self, TxContext};
@@ -17,6 +17,10 @@ module bob::manage {
         };
 
         transfer::transfer(manage, tx_context::sender(ctx));
+    }
+
+    public entry fun init_market<T>(_cap:&Cap,ctx:&mut TxContext){
+        core::init_market<T>(ctx);
     }
 
     public entry fun change_market_fee<T>(market:&mut Market<T>,_cap:&Cap,fee:u64) {
