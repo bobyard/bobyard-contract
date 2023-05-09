@@ -19,7 +19,7 @@ module bob::bobYard {
 
 
     #[test_only]
-    friend bob::bobyard_tests;
+    friend bob::internal_tests;
 
     public fun list<T, ITEM: key + store>(
         marketplace: &mut Market<T>,

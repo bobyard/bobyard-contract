@@ -1,5 +1,5 @@
 #[test_only]
-module bob::bobyard_tests {
+module bob::internal_tests {
     use sui::object::UID;
 
     const EAmountIncorrect: u64 = 0;
