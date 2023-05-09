@@ -1,4 +1,4 @@
-module bob::BobYardIO {
+module bob::bobYard {
 
     use bob::core::Market;
     use sui::clock::Clock;
